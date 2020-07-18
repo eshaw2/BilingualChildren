@@ -10,7 +10,6 @@ library(dplyr)
 library(ggplot2)
 library(mice)
 
-setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/')
 data = read.csv('data_raw/RawData_unlocked.csv')
 
 # trace(psych::polychoric, edit=TRUE)
