@@ -1,0 +1,197 @@
+---
+title: "EFA"
+author: "Elena Shaw"
+date: "10/07/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(psych)
+library(dplyr)
+library(ggplot2)
+
+setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+
+# MI_corr = read.csv('data/MI_max_corrs.csv')
+MI_corr = read.csv('data/MI_cons_corrs.csv')
+MI1_corr = MI_corr %>% dplyr::filter(imp==1) %>% select(-imp)
+MI2_corr = MI_corr %>% dplyr::filter(imp==2) %>% select(-imp)
+MI3_corr = MI_corr %>% dplyr::filter(imp==3) %>% select(-imp)
+MI4_corr = MI_corr %>% dplyr::filter(imp==4) %>% select(-imp)
+MI5_corr = MI_corr %>% dplyr::filter(imp==5) %>% select(-imp)
+```
+
+## Number of factors? PCA
+```{r}
+data1_pca1 = principal(MI1_corr,nfactors = 1, rotate = 'none')
+data1_pca2 = principal(MI1_corr,nfactors = 2, rotate = 'none')
+# data1_pca1$communality
+# data1_pca2$communality
+
+principal(MI1_corr,nfactors = 1, rotate = 'none')
+principal(MI1_corr,nfactors = 2, rotate = 'none')
+
+principal(MI2_corr,nfactors = 1, rotate = 'none')
+principal(MI2_corr,nfactors = 2, rotate = 'none')
+principal(MI2_corr,nfactors = 3, rotate = 'none')
+
+principal(MI3_corr,nfactors = 1, rotate = 'none')
+principal(MI3_corr,nfactors = 2, rotate = 'none')
+principal(MI3_corr,nfactors = 3, rotate = 'none')
+
+principal(MI4_corr,nfactors = 1, rotate = 'none')
+principal(MI4_corr,nfactors = 2, rotate = 'none')
+principal(MI4_corr,nfactors = 3, rotate = 'none')
+
+principal(MI5_corr,nfactors = 1, rotate = 'none')
+principal(MI5_corr,nfactors = 2, rotate = 'none')
+principal(MI5_corr,nfactors = 3, rotate = 'none')
+```
+
+## Number of factors? Parallel Analysis
+```{r}
+data1_fa1 = fa.parallel(MI1_corr, nfactors = 1, fm="pa", n.iter=100)
+data1_fa2 = fa.parallel(MI1_corr, nfactors = 2, fm="pa", n.iter=100)
+
+# data1_fa2$fa.values
+# data1_fa$e.values
+# plot(data1_fa)
+
+data2_fa1 = fa.parallel(MI2_corr, nfactors = 1, fm="pa", n.iter=100)
+data2_fa2 = fa.parallel(MI2_corr, nfactors = 2, fm="pa", n.iter=100)
+
+fa.parallel(MI3_corr, nfactors = 1, fm="pa", n.iter=100)
+fa.parallel(MI3_corr, nfactors = 2, fm="pa", n.iter=100)
+fa.parallel(MI4_corr, nfactors = 1, fm="pa", n.iter=100)
+fa.parallel(MI4_corr, nfactors = 2, fm="pa", n.iter=100)
+fa.parallel(MI5_corr, nfactors = 1, fm="pa", n.iter=100)
+fa.parallel(MI5_corr, nfactors = 2, fm="pa", n.iter=100)
+```
+## Number of factors? Simple Structure
+```{r}
+# orthoganol rotation
+vss1 = vss(MI1_corr,n=5, n.obs=89)
+vss1_pa = vss(MI1_corr,n=5, fm="pa", n.obs=89)
+
+vss2 = vss(MI2_corr,n=5, n.obs=89)
+vss2_pa = vss(MI2_corr,n=5, fm="pa", n.obs=89)
+
+vss3 = vss(MI3_corr,n=5, n.obs=89)
+vss3_pa = vss(MI3_corr,n=5, fm="pa", n.obs=89)
+
+vss4 = vss(MI4_corr,n=5, n.obs=89)
+vss4_pa = vss(MI4_corr,n=5, fm="pa", n.obs=89)
+
+vss5 = vss(MI5_corr,n=5, n.obs=89)
+vss5_pa = vss(MI5_corr,n=5, fm="pa", n.obs=89)
+
+summary(vss1)
+summary(vss1_pa)
+summary(vss2)
+summary(vss2_pa)
+summary(vss3)
+summary(vss3_pa)
+summary(vss4)
+summary(vss4_pa)
+summary(vss5)
+summary(vss5_pa)
+
+# oblique rotation
+vss1_ob = vss(MI1_corr,n=5, rotate = "oblimin", n.obs=89)
+vss1_pa_ob = vss(MI1_corr,n=5, rotate = "oblimin", fm="pa", n.obs=89)
+
+vss2_ob = vss(MI2_corr,n=5, rotate = "oblimin", n.obs=89)
+vss2_pa_ob = vss(MI2_corr,n=5, rotate = "oblimin", fm="pa", n.obs=89)
+
+vss3_ob = vss(MI3_corr,n=5, rotate = "oblimin", n.obs=89)
+vss3_pa_ob = vss(MI3_corr,n=5, rotate = "oblimin", fm="pa", n.obs=89)
+
+vss4_ob = vss(MI4_corr,n=5, rotate = "oblimin", n.obs=89)
+vss4_pa_ob = vss(MI4_corr,n=5, rotate = "oblimin", fm="pa", n.obs=89)
+
+vss5_ob = vss(MI5_corr,n=5, rotate = "oblimin", n.obs=89)
+vss5_pa_ob = vss(MI5_corr,n=5, rotate = "oblimin", fm="pa", n.obs=89)
+
+summary(vss1_ob)
+summary(vss1_pa_ob)
+summary(vss2_ob)
+summary(vss2_pa_ob)
+summary(vss3_ob)
+summary(vss3_pa_ob)
+summary(vss4_ob)
+summary(vss4_pa_ob)
+summary(vss5_ob)
+summary(vss5_pa_ob)
+```
+## Number of factors? Clustering
+```{r}
+# pdf(file='plots/iclust_max_corr.pdf', width=16)
+iclust(as.matrix(MI1_corr))
+# dev.off()
+
+iclust(as.matrix(MI2_corr))
+iclust(as.matrix(MI3_corr))
+iclust(as.matrix(MI4_corr))
+iclust(as.matrix(MI5_corr))
+```
+
+## EFA
+```{r}
+# oblique rotation
+fa1_MR_output = fa(MI1_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa1_PA_output = fa(MI1_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+fa1_MR_output
+fa1_PA_output
+
+fa(MI2_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa(MI2_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+fa(MI3_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa(MI3_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+fa(MI4_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa(MI4_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+fa(MI5_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa(MI5_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+```
+For conservative correlation, there is some desire to split up and create a 3rd group, but this is usually only made up of 1 indicator. Depending on which imputed data is used, that extra group would be made up of only "pvt lapses/false starts" or the "flanker incongruent".
+
+Factor Analysis REALLY does not like the ovt_count_falsestarts
+
+## Factor Interpretation: 2 fators
+```{r}
+unrotated1 = fa(MI1_corr,nfactors=2,n.obs=89, rotate='none', n.iter=100, max.iter=1000)
+rotated1 = fa(MI1_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+# fa(MI1_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+unrotated1$loadings
+rotated1$loadings
+```
+```{r}
+fa(MI1_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI2_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI3_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI4_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI5_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)$loadings
+```
+## Factor Interpretation: 3 fators
+```{r}
+fa(MI1_corr,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI2_corr,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI3_corr,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI4_corr,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI5_corr,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+```
+
+IM_data1: 3rd category: pvt_count_falsestarts (.871) + maybe pvt_number_of_lapses (-.345)
+IM_data2: 3rd category: flanker_percenterrors_congruent (.590) + flanker_percenterrors_incongruent (.713) + flanker_mean_rt_incongruent (.521
+)
+IM_data3: 3rd cateogry: flanker_percenterrors_congruent (.527) + pvt_count_falsestarts (.412)
+IM_data4: 3rd: all flanker indicators + no pvt_count_falsestarts
+IM_data5: 3rd: flanker_mean_rt_congruent (.809) + flanker_mean_rt_incongruent (.469) + maybe pvt_number_of_lapses (.327)
+
+
+## Conclusion
+Either correlation ultimately does better with 2 factors. The liberal correlation makes this very clear with minimal disagreement among the methods. This is less clear with the conservative analysis. There is a desire to create a 3rd factor but what that 3rd factor would encompass is not stable. It appears to want to split up the 3 indicator types, but the cross-loading on the flanker and pvt indicators tend to be fairly equal.
