@@ -10,8 +10,6 @@ library(psych)
 library(dplyr)
 library(ggplot2)
 
-setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
-
 # MI_corr = read.csv('data/MI_max_corrs.csv')
 MI_corr = read.csv('data/MI_cons_corrs.csv')
 MI1_corr = MI_corr %>% dplyr::filter(imp==1) %>% select(-imp)
