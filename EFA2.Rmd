@@ -1,0 +1,103 @@
+---
+title: "EFA"
+author: "Elena Shaw"
+date: "10/07/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(psych)
+library(dplyr)
+library(ggplot2)
+
+setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+
+MI_corr_full = read.csv('data/MI_corrs_full.csv')
+MI_corr_rm = read.csv('data/MI_corrs_rm.csv')
+```
+
+## Number of factors? PCA
+```{r}
+eigen(MI_corr_full)
+eigen(MI_corr_rm)
+
+pca_full = principal(MI_corr_full,nfactors = 3, rotate = 'none', n.obs=89)
+pca_rm = principal(MI_corr_rm,nfactors = 3, rotate = 'none', n.obs=89)
+
+Evec_full = eigen(MI_corr_full)$vectors[,1:3]
+rownames(Evec_full) = colnames(MI_corr_full)
+
+Evec_rm = eigen(MI_corr_rm)$vectors[,1:3]
+rownames(Evec_rm) = colnames(MI_corr_rm)
+
+# saveRDS(Evec_full, 'data/cons_Evec_full.rds')
+# saveRDS(Evec_rm, 'data/cons_Evec_rm.rds')
+```
+
+## Number of factors? Parallel Analysis
+```{r}
+fa.parallel(MI_corr_full, nfactors = 3, fa="fa", fm="pa", n.iter=1000)
+fa.parallel(MI_corr_rm, nfactors = 3, fa="fa", fm="pa", n.iter=1000)
+```
+## Number of factors? Simple Structure
+```{r}
+# oblique rotation
+vss_ob = vss(MI_corr_full,n=5, rotate = "oblimin", n.obs=89)
+vss_pa_ob = vss(MI_corr_full,n=5, rotate = "oblimin", fm="pa", n.obs=89)
+summary(vss_ob)
+summary(vss_pa_ob)
+```
+## Number of factors? Clustering
+```{r}
+# pdf(file='plots/iclust_max_corr.pdf', width=16)
+iclust(as.matrix(MI_corr_full))
+iclust(as.matrix(MI_corr_rm))
+# dev.off()
+```
+
+## EFA
+```{r}
+# oblique rotation
+fa(MI_corr_full,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa(MI_corr_full,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+fa(MI_corr_rm,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+fa(MI_corr_rm,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+```
+For conservative correlation, there is some desire to split up and create a 3rd group, but this is usually only made up of 1 indicator. Depending on which imputed data is used, that extra group would be made up of only "pvt lapses/false starts" or the "flanker incongruent".
+
+Factor Analysis REALLY does not like the ovt_count_falsestarts
+
+## Factor Interpretation: 2 fators
+```{r}
+unrotated = fa(MI_corr_full,nfactors=2,n.obs=89, rotate='none', n.iter=100, max.iter=1000)
+rotated = fa(MI_corr_full,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)
+# fa(MI1_corr,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')
+
+unrotated$loadings
+rotated$loadings
+```
+```{r}
+fa(MI_corr_full,nfactors=2,n.obs=89, n.iter=100, max.iter=1000)$loadings
+```
+## Factor Interpretation: 3 factors
+```{r}
+fa(MI_corr_full,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+fa(MI_corr_rm,nfactors=3,n.obs=89, n.iter=100, max.iter=1000)$loadings
+```
+
+IM_data1: 3rd category: flanker_percenterrors_congruent (.62) + flanker_percenterrors_incongruent (.67) + partial loading for flanker_mean_rt_incongruent (.33)
+IM_data2: 3rd category: brief_self.monitor (1.01) + partial initiate (.323) & inhibit (.29)
+IM_data3: 3rd cateogry: brief_self.monitor(1.00) + partial initiate (.37) & inhibit (.29)
+IM_data4: 3rd: brief_self.monitor(1.00) + partial initiate (.36) & inhibit (.27)
+IM_data5: 3rd: brief_self.monitor(.61) + brief_inhibit (.87) + partial initiate (.36) oom (.36)
+ 
+## Conclusion
+Either correlation ultimately does better with 2 factors. The liberal correlation makes this very clear with minimal disagreement among the methods. This is less clear with the conservative analysis. There is a desire to create a 3rd factor but what that 3rd factor would encompass is not stable. It appears to want to split up the 3 indicator types, but the cross-loading on the flanker and pvt indicators tend to be fairly equal.
+
+## PCA for language
+```{r}
+read.csv('data/')
+eigen(MI_corr_full)
+
+```
