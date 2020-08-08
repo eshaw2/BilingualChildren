@@ -10,10 +10,14 @@ library(psych)
 library(dplyr)
 library(ggplot2)
 
-setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+# MI_corr = read.csv('data/MI_max_corrs.csv')
+MI_corr = read.csv('data/MI_cons_corrs.csv')
+MI1_corr = MI_corr %>% dplyr::filter(imp==1) %>% select(-imp)
+MI2_corr = MI_corr %>% dplyr::filter(imp==2) %>% select(-imp)
+MI3_corr = MI_corr %>% dplyr::filter(imp==3) %>% select(-imp)
+MI4_corr = MI_corr %>% dplyr::filter(imp==4) %>% select(-imp)
+MI5_corr = MI_corr %>% dplyr::filter(imp==5) %>% select(-imp)
 
-MI_corr_full = read.csv('data/MI_corrs_full.csv')
-MI_corr_rm = read.csv('data/MI_corrs_rm.csv')
 ```
 
 ## Number of factors? PCA
@@ -99,5 +103,6 @@ Either correlation ultimately does better with 2 factors. The liberal correlatio
 ```{r}
 read.csv('data/')
 eigen(MI_corr_full)
-
 ```
+## Conclusion
+Either correlation ultimately does better with 2 factors. The liberal correlation makes this very clear with minimal disagreement among the methods. This is less clear with the conservative analysis. There is a desire to create a 3rd factor but what that 3rd factor would encompass is not stable. It appears to want to split up the 3 indicator types, but the cross-loading on the flanker and pvt indicators tend to be fairly equal.

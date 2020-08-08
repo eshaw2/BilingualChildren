@@ -9,7 +9,6 @@ output: pdf_document
 library(dplyr)
 library(ggplot2)
 
-setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/')
 data = read.csv('data_raw/RawData_unlocked.csv')
 data_numeric = read.csv('code/BilingualChildren/data/data_num.csv')
 
