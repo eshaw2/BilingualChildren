@@ -1,0 +1,152 @@
+---
+title: "CFA"
+author: "Elena Shaw"
+date: "18/07/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(lavaan)
+library(foreign)
+library(dplyr)
+library(ggplot2)
+
+setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+
+MI_data = read.csv('data/MI_complete_data.csv') %>%
+# MI_data = read.csv('data/MI_complete_out_rm.csv') %>%
+            mutate(BIH = brief_raw_inhibit,
+                    BSM = brief_raw_self.monitor,
+                    BS = brief_raw_shift,
+                    BEC = brief_raw_emotional_control,
+                    BIT = brief_raw_initiate,
+                    BWM = brief_raw_working_memory,
+                    BPO = brief_raw_plan_organise,
+                    BTM = brief_raw_task_monitor,
+                    BOM = brief_raw_organisation_of_materials,
+                    FCE = flanker_percenterrors_congruent,
+                    FIE = flanker_percenterrors_incongruent,
+                    FCR = flanker_mean_rt_congruent,
+                    FIR = flanker_mean_rt_incongruent,
+                    PBR = pvt_mean_rt,
+                    PLC = pvt_number_of_lapses,
+                    PLR = pvt_mean_lapse_rt,
+                    PFC = pvt_count_falsestarts
+            )
+
+vars_to_transform = c('PBR','PLR') #select(contains(c("B_","rt","ct","err")))
+
+# B_init = brief_raw_initiate,
+#  B_inhi = brief_raw_inhibit,
+#  B_sm = brief_raw_self.monitor,
+#  B_s = brief_raw_shift,
+#  B_ec = brief_raw_emotional_control,
+#  B_wm = brief_raw_working_memory,
+#  B_po = brief_raw_plan_organise,
+#  B_tm = brief_raw_task_monitor,
+#  B_oom = brief_raw_organisation_of_materials,
+#  con_err = flanker_percenterrors_congruent,
+#  con_rt = flanker_mean_rt_congruent,
+#  inc_err = flanker_percenterrors_incongruent,
+#  inc_rt = flanker_mean_rt_incongruent,
+#  rt = pvt_mean_rt,
+#  fs_ct = pvt_count_falsestarts,
+#  lap_rt = pvt_mean_lapse_rt,
+#  lap_ct = pvt_number_of_lapses,
+```
+marker method: fixes the first loading of each factor to 1
+variance standardization method: fixes the variance of each factor to 1 but freely estimates all loadings.
+## Single factor loadings
+```{r}
+MI_std = MI_data %>% select(contains(c("B_","rt","ct","err")))%>%
+              mutate_at(PBR = log(PBR),
+                        PLR = log(PLR))
+
+factor1 = 'f1 =~ BPO + BIT + BTM + BSM + BS + BWM' # + BIH' # + BEC + BOM'
+cfa_f1_marker = cfa.mi(factor1, data=MI_std, m=5)
+summary(cfa_f1_marker,standardized=TRUE)
+cfa_f1_std = cfa.mi(factor1, data=MI_std, m=5, std.lv=TRUE)
+summary(cfa_f1_std,standardized=TRUE, fit.measures=TRUE)
+
+inspect(cfa_f1_std, "fit")
+inspect(cfa_f1_std, "impute")
+
+lavTestLRT(cfa_f1_std)
+
+factor2 = 'f2 =~ con_err + con_rt + rt + lap_rt' #+ inc_err + inc_rt
+cfa_f2_marker = cfa.mi(factor2, data=MI_std, m=5)
+summary(cfa_f2_marker,standardized=TRUE)
+cfa_f2_std = cfa.mi(factor2, data=MI_std, m=5, std.lv=TRUE)
+summary(cfa_f2_std,standardized=TRUE, fit.measures=TRUE)
+```
+
+
+Conclusions:
+1) Outlier removed
+- none are shown to have good fit; only model which achieves "good approximation" is single factor on BRIEF with only B_po, B_init, B_tm, B_sm, B_s, B_wm, and MAYBE B_oom.
+- single factor has THE worst fit across all reported metrics
+- fit on non-brief items is not good; fit is maximized with all indicators except false starts; it is further improved if lapse count is also removed.
+
+2) Full dataset
+- Both show perfect/good fit (RMSE = 0.00, CFI=1, F-test > 50%)
+- brief has better overall fit than flanker+pvt (except by AIC/BIC)
+
+## consider 2 factors
+```{r}
+#uncorrelated two factor solution, var std method
+uncorr1_f2eq ='f1 =~ B_po + B_init + B_tm + B_sm + B_s + B_wm
+          f2 =~ a*(con_err + con_rt + rt + lap_rt)
+          f1 ~~ 0*f2 ' 
+uncorr1_f2eq = cfa.mi(uncorr1_f2eq, data = MI_std, m=5, std.lv=TRUE) 
+summary(uncorr1_f2eq, fit.measures=TRUE, standardized=TRUE)
+
+uncorr2_f2eq ='f1 =~ a*(B_po + B_init + B_tm + B_sm + B_s + B_wm)
+          f2 =~ con_err + con_rt + rt + lap_rt
+          f1 ~~ 0*f2 ' 
+uncorr2_f2eq = cfa.mi(uncorr2_f2eq, data = MI_std, m=5, std.lv=TRUE) 
+summary(uncorr2_f2eq, fit.measures=TRUE, standardized=TRUE)
+
+# BAD FIT:
+# uncorr_f1eq ='f1 =~ a*(B_po + B_init + B_tm + B_inhi + B_sm + B_s + B_ec + B_wm + B_oom)
+#           f2 =~ con_err + con_rt + inc_err + inc_rt + rt + lap_rt + lap_ct
+#           f1 ~~ 0*f2 ' 
+# uncorr_f1eq = cfa(uncorr_f1eq, data = MI_std, std.lv=TRUE) 
+# summary(uncorr_f1eq, fit.measures=TRUE, standardized=TRUE)
+
+#correlated two factor solution, marker method
+corr1 = 'f1 =~ B_po + B_init + B_tm + B_sm + B_s + B_wm
+        f2 =~ con_err + con_rt + rt + lap_rt' 
+# B_po + B_init + B_tm + B_inhi + B_sm + B_s + B_ec + B_wm + B_oom
+# con_err + con_rt + inc_err + inc_rt + rt + lap_rt
+corr1_2factors = cfa.mi(corr1, data = MI_std, m=5, std.lv=TRUE) 
+summary(corr_2factors, fit.measures=TRUE, standardized=TRUE)
+
+# good fit, but unjustified removal for the increase in fit
+# corr2 = 'f1 =~ B_po + B_init + B_tm + B_sm + B_wm
+#         f2 =~ con_err + con_rt + rt + lap_rt' 
+# corr2_2factors = cfa(corr2, data = MI_std, std.lv=TRUE) 
+# summary(corr2_2factors, fit.measures=TRUE, standardized=TRUE)
+```
+
+Conclusions:
+1) Outliers removed
+- none are shown to have good fit.
+- uncorrelated factors with factor 2 set to have equal contribution fits best
+- if correlated, removing lapse count improves fit
+
+2) Full dataset
+- Reasonable fit using combinations determined above (on individual factors)
+- Factors are likely uncorrelated (worst fit and low correlation, -.25)
+- Uncorr1 has near perfect fit by RMSE, but uncorr2 has lower AIC/BIC
+
+## 2nd-order?
+```{r}
+#+ con_rt + inc_rt
+mix_factor = 'f1 =~ B_po + B_init + B_tm + B_sm + B_s + B_wm
+                f2 =~ con_err + con_rt + rt + lap_rt
+                f3 =~ 1*f1 + 1*f2
+                f3 ~~ f3 '
+cfa_mf_std = cfa.mi(mix_factor, data=MI_std, m=5, std.lv=TRUE)
+summary(cfa_mf_std,standardized=TRUE, fit.measures=TRUE)
+
+```

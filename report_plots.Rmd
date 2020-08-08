@@ -1,0 +1,774 @@
+---
+title: "report_plots"
+author: "Elena Shaw"
+date: "21/07/2020"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(psych)
+source("func.R")
+
+setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+data_numeric = rename_ef_cols(read.csv('data/data_num.csv')) %>% select(order(colnames(.))) 
+
+demo_data = data_numeric  %>% 
+              select(gender, age_m, diagnosis, SCQ,
+               bilec_total_input, age_acquisition, where_english) %>%
+              mutate(diagnosis = as.factor(diagnosis),
+                     gender = as.factor(gender),
+                     age = age_m/12,
+                     years_bilingual = (age - age_acquisition)*bilec_total_input,
+                     year_bi_std = scale(years_bilingual)
+                     )
+
+MI_corr_full = rename_ef_cols(read.csv('data/MI_corrs_full.csv')) %>% 
+                  select(-contains("_"))
+rownames(MI_corr_full) = colnames(MI_corr_full)
+MI_corr_full = MI_corr_full[order(colnames(MI_corr_full)),order(colnames(MI_corr_full))]
+                
+MI_corr_rm = rename_ef_cols(read.csv('data/MI_corrs_rm.csv')) %>% 
+                select(-contains("_"))
+rownames(MI_corr_rm) = colnames(MI_corr_rm)
+MI_corr_rm = MI_corr_rm[order(colnames(MI_corr_rm)),order(colnames(MI_corr_rm))]
+
+EF_label_list = list(brief_raw_inhibit = "Brief: Inhibit",
+                  brief_raw_self.monitor = "Brief: Self-monitor",
+                  brief_raw_shift = "Brief: Shift",
+                  brief_raw_emotional_control = "Brief: Emotional control",
+                  brief_raw_initiate = "Brief: Initiate",
+                  brief_raw_working_memory = "Brief: Working memory",
+                  brief_raw_plan_organise = "Brief: Planning",
+                  brief_raw_task_monitor = "Brief: Task-monitor",
+                  brief_raw_organisation_of_materials = "Brief: Org. of materials",
+                  flanker_percenterrors_congruent = "Flanker: Congruent error",
+                  flanker_percenterrors_incongruent = "Flanker: Incongruent error",
+                  flanker_mean_rt_congruent = "Flanker: Congruent reaction time",
+                  flanker_mean_rt_incongruent = "Flanker: Incongruent reaction time",
+                  pvt_mean_rt = "PVT: Baseline reaction time",
+                  pvt_number_of_lapses = "PVT: Lapse count",
+                  pvt_mean_lapse_rt = "PVT: Lapse reaction time",
+                  pvt_count_falsestarts = "PVT: False pesponses"
+                  )
+EF_label_vec = c("Brief: Inhibit", "Brief: Self-monitor", "Brief: Shift",
+                  "Brief: Emotional control", "Brief: Initiate",
+                   "Brief: Working memory", "Brief: Planning",
+                   "Brief: Task-monitor", "Brief: Org. of materials",
+                   "Flanker: Congruent error", "Flanker: Incongruent error",
+                   "Flanker: Congruent reaction time",
+                   "Flanker: Incongruent reaction time",
+                   "PVT: Baseline reaction time", "PVT: Lapse count",
+                   "PVT: Lapse reaction time","PVT: False pesponses"
+                  )
+```
+
+## Gender + age
+```{r}
+data_numeric %>%
+  group_by(diagnosis) %>% tally()
+
+demo_df = demo_data %>% 
+              select(gender,diagnosis,age_m)
+
+ggplot(demo_df, aes(x=gender,y=age, color=diagnosis)) +
+  geom_boxplot() +
+  theme_bw() +
+  ylab("Age (years)") +
+  theme(text = element_text(size=14),
+        axis.title.x = element_blank(),
+        axis.text = element_text(size=14),
+        legend.text = element_text(size=14),
+        legend.position="top") +
+  scale_color_discrete(name = "", labels = c("TD", 
+                                             "ASD")) +
+  scale_x_discrete(labels=c("0" = "Boys", 
+                            "1" = "Girls"))
+ggsave("plots/report_demographics.pdf")
+```
+
+# Bilingualism
+```{r}
+data_numeric = read.csv('data/data_num.csv')
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(age_acquisition) %>%
+  tally()
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(where_english) %>%
+  tally()
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(where_english) %>%
+  tally()
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(age_acquisition, where_english) %>%
+  tally()
+
+
+bilingual_df = data_numeric %>% 
+                select(age_m, gender, diagnosis, bilec_total_input,
+                       age_acquisition,where_english) %>%
+                mutate(age = age_m/12,
+                       years_bilingual = (age - age_acquisition)*bilec_total_input,
+                       where_english = as.factor(where_english),
+                       diagnosis = as.factor(diagnosis),
+                       gender = as.factor(gender),
+                       age_acquisition = as.factor(age_acquisition))
+
+ggplot(bilingual_df, aes(x=where_english,y=bilec_total_input,color=diagnosis)) +
+  geom_boxplot()
+ggplot(bilingual_df, aes(x=age_acquisition,y=years_bilingual,color=diagnosis)) +
+  geom_boxplot()
+ggplot(bilingual_df, aes(x=gender,y=years_bilingual,color=diagnosis)) +
+  geom_boxplot() +
+  theme_bw() +
+  ylab("Time Spent Bilingual (years)") +
+  theme(text = element_text(size=14),
+        axis.title.x = element_blank(),
+        axis.text = element_text(size=14),
+        legend.text = element_text(size=14),
+        legend.position="top") +
+  scale_color_discrete(name = "", labels = c("TD", 
+                                             "ASD")) +
+  scale_x_discrete(labels=c("0" = "Boys", 
+                            "1" = "Girls"))
+ggsave("plots/report_exposure.pdf")
+```
+
+# Language performance
+```{r}
+lang_labels = c("VCR", "VRT")
+names(lang_labels) = c("bpvs_raw", 
+                        "vocabprocess_processing_speed_target")
+
+lang_df = data_numeric %>% 
+            select(c(gender,diagnosis,contains(c("vocab","bpvs")))) %>% 
+            mutate(diagnosis = as.factor(diagnosis),
+                    gender = as.factor(gender)) %>%
+            tidyr::pivot_longer(contains(c("vocab","bpvs")), 
+                                     names_to="subscale",
+                                     values_to="lang_score")
+                
+ggplot(lang_df, aes(x=gender,y=lang_score,color=diagnosis)) +
+  geom_boxplot() +
+  facet_wrap(~subscale, scale="free_y",
+             labeller = labeller(subscale = lang_labels)) +
+  theme_bw() +
+  ylab("Language Scores") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.position="top") +
+  scale_color_discrete(name = "", labels = c("TD", 
+                                             "ASD")) +
+  scale_x_discrete(labels=c("0" = "Boys", 
+                            "1" = "Girls"))
+ggsave('plots/report_lang_demo.pdf')
+```
+
+# EF performance
+```{r}
+EF_df = data_numeric %>% 
+              select(starts_with(c("B","F","P"))) %>%
+              select(-contains("_"))
+
+outliers_df = bind_cols(EF_df,demo_df) %>% 
+                tidyr::pivot_longer(starts_with("B"), 
+                                     names_to="subscale",
+                                     values_to="brief_score")
+
+brief_df = data_numeric %>% 
+            select(c(gender,diagnosis,starts_with("B"))) %>% 
+            select(-contains("_")) %>%
+            mutate(diagnosis = as.factor(diagnosis),
+                    gender = as.factor(gender)) %>%
+            tidyr::pivot_longer(starts_with("B"), 
+                                     names_to="subscale",
+                                     values_to="brief_score")
+
+fp_df = data_numeric %>% 
+            select(c(gender,diagnosis,starts_with(c("F","P")))) %>% 
+            select(-contains("_")) %>%
+            mutate(diagnosis = as.factor(diagnosis),
+                    gender = as.factor(gender)) %>%
+            tidyr::pivot_longer(starts_with(c("F","P")), 
+                                     names_to="subscale",
+                                     values_to="fp_score")
+                
+ggplot(brief_df, aes(x=gender,y=brief_score,color=diagnosis)) +
+  geom_boxplot() +
+  facet_wrap(~subscale) +
+  theme_bw() +
+  ylab("Brief Scores") +
+  coord_cartesian(ylim = c(5,30)) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.position="top") +
+  scale_color_discrete(name = "", labels = c("TD", 
+                                             "ASD")) +
+  scale_x_discrete(labels=c("0" = "Boys", 
+                            "1" = "Girls"))
+
+ggsave('plots/report_brief_demo.pdf')
+
+ggplot(fp_df, aes(x=gender,y=fp_score,color=diagnosis)) +
+  geom_boxplot() +
+  facet_wrap(~subscale, scale="free_y") +
+  theme_bw() +
+  ylab("Flanker/PVT Scores") +
+  theme(
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 10),
+        legend.position="top") +
+  scale_color_discrete(name = "", labels = c("TD", 
+                                             "ASD")) +
+  scale_x_discrete(labels=c("0" = "Boys", 
+                            "1" = "Girls"))
+ggsave('plots/report_FP_demo.pdf')
+```
+
+## Unadj Data
+```{r}
+pdf("plots/report_corr_unadj.pdf")
+corr_unadj = GGally::ggcorr(EF_df, geom = "blank",
+                             label = TRUE, hjust = .6) +
+                geom_point(size = 10, aes(color = coefficient > 0, alpha = abs(coefficient) > 0.25)) +
+                scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
+                guides(color = FALSE, alpha = FALSE)
+
+print(corr_unadj)
+dev.off()
+
+corr_unadj
+unadj_corr = round(cor(EF_df, use="pairwise.complete.obs", method="pearson"),2)
+sum(abs(unadj_corr) > .3 & unadj_corr!=1)/sum(unadj_corr!=1)
+
+kmo_unadj = KMO(unadj_corr)
+```
+## Data Screening
+```{r}
+pdf("plots/report_EF_scatter.pdf", height = 14, width = 14)
+
+EF_scatter = GGally::ggpairs(EF_df,
+                              upper=list(continuous = "points", combo = "facethist", 
+                                         discrete = "facetbar", na ="na"),
+                              diag=NULL,lower=NULL,
+                              progress = F)
+print(EF_scatter)
+dev.off()
+
+EF_df %>%
+  summarise_all(funs(sum(is.na(.))))
+```
+
+## Imputed data
+```{r}
+# case 1
+pdf("plots/report_corr_full.pdf")
+corr_full = GGally::ggcorr(NULL,cor_matrix = MI_corr_full, geom = "blank",
+                             label = TRUE, hjust = .6) +
+                geom_point(size = 10, aes(color = coefficient > 0, alpha = abs(coefficient) > 0.25)) +
+                scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
+                guides(color = FALSE, alpha = FALSE)
+
+print(corr_full)
+dev.off()
+
+# case 2
+pdf("plots/report_corr_rm.pdf")
+corr_rm = GGally::ggcorr(NULL,cor_matrix = MI_corr_rm, geom = "blank",
+                             label = TRUE, hjust = .6) +
+                geom_point(size = 10, aes(color = coefficient > 0, alpha = abs(coefficient) > 0.25)) +
+                scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
+                guides(color = FALSE, alpha = FALSE)
+
+print(corr_rm)
+dev.off()
+
+corr_full
+corr_rm
+```
+```{r}
+sum(abs(MI_corr_full) > .3 & MI_corr_full!=1)/sum(MI_corr_full!=1)
+sum(abs(MI_corr_rm) > .3 & MI_corr_rm!=1)/sum(MI_corr_rm!=1)
+
+cortest.bartlett(MI_corr_full, n=89)
+cortest.bartlett(MI_corr_rm, n=89)
+
+kmo_full =KMO(MI_corr_full)
+write.csv(kmo_full$MSAi,'tables/kmo_full.csv')
+kmo_rm = KMO(MI_corr_rm)
+write.csv(kmo_rm$MSAi,'tables/kmo_rm.csv')
+
+
+kmo_df = bind_rows(as.data.frame(t(kmo_unadj$MSAi)) %>% mutate(cohort="Unadjusted"),
+                   as.data.frame(t(kmo_full$MSAi)) %>% mutate(cohort="Adjusted: case 1"),
+                   as.data.frame(t(kmo_rm$MSAi))  %>% mutate(cohort="Adjusted: case 2")) %>%
+        tidyr::pivot_longer(names(EF_df),
+                     names_to = "metric",
+                     values_to = "KMO") %>% 
+        mutate(cohort = factor(cohort,levels = c("Unadjusted",
+                                          "Adjusted: case 1",
+                                          "Adjusted: case 2")))
+
+ggplot(kmo_df, aes(x=metric,y=KMO,color=cohort)) +
+  geom_point(shape=4, size=3) + 
+  geom_hline(yintercept=.7, linetype="dashed") +
+  annotate("text",x = 1.5, y = .65, label = "Mediocre") +
+  geom_rect(mapping=aes(xmin = 0, xmax = 20, ymin=.5, ymax=.7),
+            color=NA, alpha=.005) +
+  geom_hline(yintercept=.5, linetype="dashed", 
+                color = "red") +
+  geom_rect(mapping=aes(xmin = 0, xmax = 20, ymin=-Inf, ymax=.5),
+                        fill="red",color=NA, alpha=.005) +
+  annotate("text",x = 2, y = .45, label = "Unacceptable") +
+  ylab('KMO') + xlab('') +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position = "top",
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank()
+        )
+ggsave('plots/report_kmo.pdf')
+```
+
+## PCA
+```{r}
+pfc_ind = which(colnames(MI_corr_full) == "PFC")
+corr_full_16 = MI_corr_full[-pfc_ind,-pfc_ind]
+corr_rm_16 = MI_corr_rm[-pfc_ind,-pfc_ind]
+
+fct_n = 5
+
+pca_full1 = principal(MI_corr_full,nfactors = fct_n, rotate = 'none', n.obs=89)
+pca_full2 = principal(corr_full_16, nfactors = fct_n, rotate = 'none', n.obs=89)
+
+pca_rm1 = principal(MI_corr_rm,nfactors = fct_n, rotate = 'none', n.obs=89)
+pca_rm2 = principal(corr_rm_16, nfactors = fct_n, rotate = 'none', n.obs=89)
+
+pca1 = as.data.frame(list(Comp = 1:fct_n,
+                          Eval = pca_full1$values[1:fct_n],
+                          Var = cumsum(pca_full1$Vaccounted[2,]))) %>%
+        mutate(cohort="Adjusted: Case 1",
+                PFC = "With PFC")
+pca2 = as.data.frame(list(Comp = 1:fct_n,
+                          Eval = pca_full2$values[1:fct_n], 
+                          Var = cumsum(pca_full2$Vaccounted[2,]))) %>%
+        mutate(cohort="Adjusted: Case 1",
+                PFC = "Without PFC")
+pca3 = as.data.frame(list(Comp = 1:fct_n,
+                          Eval = pca_rm1$values[1:fct_n], 
+                          Var = cumsum(pca_rm1$Vaccounted[2,]))) %>%
+        mutate(cohort="Adjusted: Case 2",
+                PFC = "With PFC")
+pca4 = as.data.frame(list(Comp = 1:fct_n,
+                          Eval = pca_rm2$values[1:fct_n], 
+                          Var = cumsum(pca_rm2$Vaccounted[2,]))) %>%
+        mutate(cohort="Adjusted: Case 2",
+                PFC = "Without PFC")
+
+pca_df = bind_rows(pca1,pca2,pca3,pca4)
+
+ggplot(pca_df, aes(x=Comp,y=Eval,color=PFC)) +
+  geom_point() +
+  geom_line(aes(linetype=cohort)) + xlab('Component') + ylab('Eigenvalue') +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position = "top")
+# ggsave('plots/report_scree.pdf')
+
+ggplot(pca_df, aes(x=Comp,y=Var,color=PFC)) + 
+  geom_line(aes(linetype=cohort)) +
+  xlab('Component') + ylab('Cumulative Proportion of Variance Explained') +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position = "top")
+
+# ggsave('plots/report_pca_var.pdf')
+
+# ## Calculate rotations for later
+# Evec_full = eigen(corr_full_16)$vectors[,1:3]
+# rownames(Evec_full) = colnames(corr_full_16)
+# 
+# Evec_rm = eigen(corr_rm_16)$vectors[,1:3]
+# rownames(Evec_rm) = colnames(corr_rm_16)
+```
+
+## PCA: determine # of components
+```{r}
+# Parallel Analysis
+PA_full = fa.parallel(corr_full_16, nfactors = 3, fa="pc", fm="pa", n.iter=1000)
+PA_rm = fa.parallel(corr_rm_16, nfactors = 3, fa="pc", fm="pa", n.iter=1000)
+
+pa1 = as.data.frame(list(Comp = 1:fct_n,
+                          Eval = PA_full$pc.sim[1:fct_n])) %>%
+          mutate(cohort="Adjusted: Case 1",
+                  data = "Simulated Data")
+pa2 = as.data.frame(list(Comp = 1:fct_n,
+                          Eval = PA_rm$pc.sim[1:fct_n])) %>%
+          mutate(cohort="Adjusted: Case 2",
+                  data = "Simulated Data")
+pa3 = pca2 %>% select(-c(PFC,Var)) %>% mutate(data="Real Data")
+pa4 = pca4 %>% select(-c(PFC,Var)) %>% mutate(data="Real Data")
+
+pa_df = bind_rows(pa1,pa2,pa3,pa4)
+
+ggplot(pa_df, aes(x=Comp,y=Eval,color=cohort)) + 
+  geom_line(aes(linetype=data)) +
+  geom_point() +
+  xlab('Component') + ylab('Eigenvalue') +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position = "top")
+
+# ggsave('plots/report_PA.pdf')
+
+# MAP
+ap_full = vss(corr_full_16,n=5, rotate = "oblimin", fm="pa", n.obs=89)$map
+ap_rm = vss(corr_rm_16,n=5, rotate = "oblimin", fm="pa", n.obs=89)$map
+
+ap1 = as.data.frame(list(Comp = 1:fct_n, ap_val = ap_full)) %>%
+        mutate(cohort="Adjusted: Case 1")
+ap2 = as.data.frame(list(Comp = 1:fct_n, ap_val = ap_rm)) %>%
+        mutate(cohort="Adjusted: Case 2")
+
+map_df = bind_rows(ap1,ap2)
+
+ggplot(map_df, aes(x=Comp,y=ap_val,color=cohort)) + 
+  geom_line() +
+  geom_point() +
+  xlab('Component') + ylab('Average Partial Correlation') +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position = "top")
+
+# ggsave('plots/report_map.pdf')
+```
+
+## PFA
+```{r}
+# oblique rotation
+fa(corr_full_16,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')$loadings
+fa(corr_rm_16,nfactors=2,n.obs=89, n.iter=100, max.iter=1000, fm='pa')$loadings
+
+fa(corr_full_16,nfactors=3,n.obs=89, n.iter=100, max.iter=1000, fm='pa')$loadings
+fa(corr_rm_16,nfactors=3,n.obs=89, n.iter=100, max.iter=1000, fm='pa')$loadings
+```
+
+## CFA: single factor
+```{r}
+library(lavaan)
+library(foreign)
+library(semTools)
+
+EF_df = data_numeric %>% 
+              select(c(diagnosis,gender,starts_with(c("B","F","P")))) %>%
+              select(-contains("_"))
+
+EF_std_full = EF_df %>% select(-PFC) %>% mutate_all(scale)
+
+
+EF_std_rm = EF_df %>% select(-PFC) %>%
+              mutate(BSM = replace(BSM, BSM == 48,NA)) %>%
+              mutate(across(-c(diagnosis,gender), scale))
+
+# Factor 1
+f1 = 'f1 =~ BPO + BS + BWM + BIT + BSM + BIH + BTM + BEC + BOM'
+cfa_f1_full = cfa.mi(f1, data=as.data.frame(as.matrix(EF_std_full)), 
+                     miPackage = "mice",
+                     m=5, std.lv=TRUE)
+fitsum1_full = summary(cfa_f1_full,standardized=TRUE, fit.measures=TRUE)
+fitMeasures(cfa_f1_full)
+cfa_f1_rm = cfa.mi(f1, data=as.data.frame(as.matrix(EF_std_rm)), 
+                   miPackage = "mice",
+                   m=5, std.lv=TRUE)
+fitsum1_rm = summary(cfa_f1_rm,standardized=TRUE, fit.measures=TRUE)
+fitMeasures(cfa_f1_rm)
+
+# Factor 2
+f22 = 'f2 =~ FCR + FCE + FIR + PLC + FIE' # + PBR + PLR'
+cfa_f22_full = cfa.mi(f22, data=as.data.frame(as.matrix(EF_std_full)), 
+                    miPackage = "mice",
+                    m=5, std.lv=TRUE)
+fitsum22_full = summary(cfa_f22_full, standardized=TRUE, fit.measures=TRUE)
+fitMeasures(cfa_f22_full)
+cfa_f22_rm = cfa.mi(f22, data=as.data.frame(as.matrix(EF_std_rm)), 
+                    miPackage = "mice",
+                    m=5, std.lv=TRUE)
+fitsum22_rm = summary(cfa_f22_rm, standardized=TRUE, fit.measures=TRUE)
+fitMeasures(cfa_f22_rm)
+
+f23 = 'f2 =~ FCR + FCE + FIR + FIE'
+cfa_f23_full = cfa.mi(f23, data=as.data.frame(as.matrix(EF_std_full)), 
+                    miPackage = "mice",
+                    m=5, std.lv=TRUE)
+fitsum23_full = summary(cfa_f23_full, standardized=TRUE, fit.measures=TRUE)
+fitMeasures(cfa_f23_full)
+cfa_f23_rm = cfa.mi(f23, data=as.data.frame(as.matrix(EF_std_rm)), 
+                    miPackage = "mice",
+                    m=5, std.lv=TRUE)
+fitsum23_rm = summary(cfa_f23_rm, standardized=TRUE, fit.measures=TRUE)
+fitMeasures(cfa_f23_rm)
+```
+
+## CFA: multi-factor
+```{r}
+EF_rm_sub = EF_std_rm %>% filter(diagnosis==0)
+
+# + BEC + BOM
+# + PBR + PLR
+corr1 = 'f1 =~ BPO + BS + BWM + BIT + BSM + BIH + BTM
+         f2 =~ FCR + FCE + FIR + FIE + PLC' 
+
+# corr_2f_full = cfa.mi(corr1, data = as.data.frame(as.matrix(EF_std_full)),
+#                         miPackage = "mice",
+#                         m=5, std.lv=TRUE) 
+# summary(corr_2f_full, fit.measures=TRUE, standardized=TRUE)
+# fitMeasures(corr_2f_full) # aic: 2761.819
+corr_2f_rm = cfa.mi(corr1, data = as.data.frame(as.matrix(EF_rm_sub)),
+                        miPackage = "mice",
+                        m=5, std.lv=TRUE) 
+supress1 = summary(corr_2f_rm, fit.measures=TRUE, standardized=TRUE)
+fitMeasures(corr_2f_rm) # aic: 2683.592 
+
+# + FCR
+corr2 = 'f1 =~ BPO + BS + BWM + BIT + BSM + BIH + BTM
+         f2 =~ FCR + FCE + FIR + FIE + PLC
+         f3 =~ PBR + PLR + FCE + FCR' 
+
+# corr_3f_full = cfa.mi(corr2, data = as.data.frame(as.matrix(EF_std_full)),
+#                         miPackage = "mice",
+#                         m=5, std.lv=TRUE) 
+# summary(corr_3f_full, fit.measures=TRUE, standardized=TRUE)
+# fitMeasures(corr_3f_full) # aic: 2601.354 
+corr_3f_rm = cfa.mi(corr2, data = as.data.frame(as.matrix(EF_rm_sub)),
+                        miPackage = "mice",
+                        m=5, std.lv=TRUE) 
+supress2 =summary(corr_3f_rm, fit.measures=TRUE, standardized=TRUE)
+fitMeasures(corr_3f_rm) # aic: 2535.164
+
+# 2nd order
+# + PBR + PLR
+mix_2f = 'f1 =~ BPO + BS + BWM + BIT + BSM + BIH + BTM
+          f2 =~ FCR + FCE + FIR + FIE + PLC
+          f4 =~ 1*f1 + 1*f2
+          f4 ~~ f4 '
+# m2f_full = cfa.mi(mix_2f, data = as.data.frame(as.matrix(EF_std_full)),
+#                     miPackage = "mice",
+#                     m=5, std.lv=TRUE)
+# summary(m2f_full,standardized=TRUE, fit.measures=TRUE)
+# fitMeasures(m2f_full)
+m2f_rm = cfa.mi(mix_2f, data = as.data.frame(as.matrix(EF_rm_sub)),
+                    miPackage = "mice",
+                    m=5, std.lv=TRUE)
+supress3 = summary(m2f_rm,standardized=TRUE, fit.measures=TRUE)
+fitMeasures(m2f_rm)
+
+# + FCR
+mix_3f = 'f1 =~ BPO + BS + BWM + BIT + BSM + BIH + BTM
+          f2 =~ FCR + FCE + FIR + FIE + PLC
+          f3 =~ PBR + PLR + FCE
+          f4 =~ 1*f1 + 1*f2 + 1*f3
+          f4 ~~ f4 '
+# m3f_full = cfa.mi(mix_3f, data = as.data.frame(as.matrix(EF_std_full)),
+#                     miPackage = "mice",
+#                     m=5, std.lv=TRUE)
+# summary(m3f_full,standardized=TRUE, fit.measures=TRUE)
+# fitMeasures(m3f_full)
+m3f_rm = cfa.mi(mix_3f, data = as.data.frame(as.matrix(EF_rm_sub)),
+                    miPackage = "mice",
+                    m=5, std.lv=TRUE)
+supress4 = summary(m3f_rm,standardized=TRUE, fit.measures=TRUE)
+fitMeasures(m3f_rm)
+```
+
+## project data
+```{r}
+b7_ind = which(colnames(MI_corr_rm) %in% c("BPO","BS","BWM", "BIT", "BSM", "BIH", "BTM"))
+
+lang_corr = read.csv('data/lang_corr.csv')
+lang_rot_mat = eigen(lang_corr)$vectors[,1]
+EF_rot_mat = eigen(corr_rm_16)$vectors[b7_ind,1]
+
+data_proj = project_data_report(data_numeric, EF_rot_mat, lang_rot_mat, demo_data)
+
+ggplot(data_proj, aes(x=gender,y=EF,color=diagnosis)) +
+  geom_boxplot() +
+  theme_bw() +
+  ylab("Latent EF") +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(size = 12),
+        legend.position="top") +
+  scale_color_discrete(name = "", labels = c("TD", 
+                                             "ASD")) +
+  scale_x_discrete(labels=c("0" = "Boys", 
+                            "1" = "Girls"))
+ggsave('plots/report_new_EF.pdf')
+
+# ggplot(data_proj, aes(x=years_bilingual,y=EF,color=diagnosis)) +
+#   geom_point() +
+#   geom_smooth(method = "lm", alpha = .15, aes(fill = diagnosis)) +
+#   ggtitle("Moderation Model 1") +
+#   theme_bw() + xlim(0,10) +
+#   guides(fill = F) + xlab('Years Spent Bilingual (YSB)')+
+#   scale_color_discrete(name = "", labels = c("TD", "ASD"))
+# ggsave('plots/report_mod_model1.pdf')
+# 
+# ggplot(data_proj, aes(x=years_bilingual,y=EF,color=diagnosis)) +
+#   geom_point() +
+#   geom_smooth(formula = 'y ~ poly(x,2)',
+#               method = "lm", alpha = .15, aes(fill = diagnosis)) +
+#   ggtitle("Moderation Model 2") +
+#   theme_bw() + xlim(0,10) +
+#   guides(fill = F) + xlab('Years Spent Bilingual (YSB)')+
+#   scale_color_discrete(name = "", labels = c("TD", "ASD"))
+# ggsave('plots/report_mod_model2.pdf')
+```
+## Moderation analysis
+```{r}
+MI_obj = mice::mice(as.matrix(data_proj), maxit=0)
+
+pred_matrix = MI_obj$predictorMatrix
+pred_matrix[colnames(demo_data),]=0
+# pred_matrix[,c("SCQ","years_bilingual","year_bi_std")]=0
+method = MI_obj$method
+method[c("EF","lang")] = "pmm"
+
+MI = mice::mice(as.matrix(data_proj), maxit = 9, 
+             predictorMatrix = pred_matrix, 
+             method = method, print =  FALSE)
+proj_MI = mice::complete(MI,action='long',include=T) %>%
+                mutate_if(is.factor,function(f) as.numeric(levels(f))[f]) %>% 
+                mutate(ysb2 = years_bilingual**2,
+                       ) %>% as.matrix() %>% as.data.frame()
+```
+## mod on diagnosis
+```{r}
+library(pwr)
+proj_sub = proj_MI %>% filter(gender==0)
+n = demo_df %>% filter(gender==0) %>% nrow()
+
+model0 = 'EF ~ -1 + years_bilingual + diagnosis'
+fit0 = lm.mids(model0, data = as.mids(proj_sub))
+summary(mice::pool(fit0))
+anova0 = miceadds::mi.anova(as.mids(proj_sub), formula= model0, type=3)
+calc_power_report(n,length(mice::pool(fit0)),
+                  anova0$r.squared, .05)$power
+
+model1 = 'EF ~ -1 + years_bilingual*diagnosis'
+fit1 = lm.mids(model1, data = as.mids(proj_sub))
+summary(mice::pool(fit1))
+anova1 = miceadds::mi.anova(as.mids(proj_sub), formula= model1, type=3)
+calc_power_report(n,length(mice::pool(fit1)),
+                  anova1$r.squared, .05)$power
+
+model2 = 'EF ~ -1 + years_bilingual*diagnosis + ysb2*diagnosis'
+fit2 = lm.mids(model2, data = as.mids(proj_sub))
+summary(mice::pool(fit2))
+anova2 = miceadds::mi.anova(as.mids(proj_sub), formula= model2, type=3)
+calc_power_report(n,length(mice::pool(fit2)),
+                  anova2$r.squared, .06)$power
+
+summary(D1(fit0))
+summary(D1(fit1, fit0))
+summary(D1(fit2, fit0))
+summary(D1(fit2, fit1))
+```
+
+## mod on SCQ
+```{r}
+proj_TD = mice::complete(MI,action='long',include=T) %>%
+                mutate_if(is.factor,function(f) as.numeric(levels(f))[f]) %>% 
+                mutate(ysb2 = years_bilingual**2,
+                       scq2 = (years_bilingual**2) * SCQ
+                       ) %>% 
+                filter(diagnosis==0, gender==0) %>% as.matrix() %>% as.data.frame()
+n = demo_df %>% filter(diagnosis==0, gender==0) %>% nrow()
+
+model_base = 'EF ~ years_bilingual+SCQ'
+fit_base= lm.mids(model_base, data = as.mids(proj_TD))
+summary(mice::pool(fit_base))
+anova_base = miceadds::mi.anova(as.mids(proj_sub), formula= model_base, type=3)
+calc_power_report(n,length(mice::pool(fit_base)),
+                  anova_base$r.squared, .05)$power
+
+model3 = 'EF ~ years_bilingual*SCQ'
+fit3 = lm.mids(model3, data = as.mids(proj_TD))
+summary(mice::pool(fit3))
+anova3 = miceadds::mi.anova(as.mids(proj_sub), formula= model3, type=3)
+calc_power_report(n,length(mice::pool(fit3)),
+                  anova3$r.squared, .05)$power
+
+model4 = 'EF ~ years_bilingual*SCQ + ysb2*SCQ'
+fit4 = lm.mids(model4, data = as.mids(proj_TD))
+summary(mice::pool(fit4))
+anova4 = miceadds::mi.anova(as.mids(proj_sub), formula= model4, type=3)
+calc_power_report(n,length(mice::pool(fit4)),
+                  anova4$r.squared, .05)$power
+
+summary(D1(fit_base))
+summary(D1(fit3))
+summary(D1(fit4))
+# summary(D1(fit4, fit3))
+# summary(D1(fit4, fit_base))
+# summary(D1(fit3, fit_base))
+```
+
+## Mediation Analysis: (unmoderated)
+```{r}
+proj_diag = proj_MI %>% filter(diagnosis==1)
+n = demo_df %>% filter(diagnosis==1) %>% nrow()
+
+# step 1
+stp1_model = 'EF ~ lang'
+med_stp1 = lm.mids(stp1_model, data = as.mids(proj_diag))
+summary(mice::pool(med_stp1))
+summary(D1(med_stp1))
+med_anova1 = miceadds::mi.anova(as.mids(proj_diag), formula= stp1_model, type=3)
+calc_power_report(n,length(mice::pool(med_stp1)),
+                  med_anova1$r.squared, .05)$power
+
+# step 2
+stp2_model = 'years_bilingual ~ lang'
+med_stp2 = lm.mids(stp2_model, data = as.mids(proj_diag))
+summary(mice::pool(med_stp2))
+summary(D1(med_stp2))
+med_anova2 = miceadds::mi.anova(as.mids(proj_diag), formula= stp2_model, type=3)
+calc_power_report(n,length(mice::pool(med_stp2)),
+                  med_anova2$r.squared, .05)$power
+
+# step 3
+stp3_model = 'EF ~ lang + years_bilingual'
+med_stp3 = lm.mids(stp3_model, data = as.mids(proj_diag))
+summary(mice::pool(med_stp3))
+summary(D1(med_stp3))
+med_anova3 = miceadds::mi.anova(as.mids(proj_diag), formula= stp3_model, type=3)
+calc_power_report(n,length(mice::pool(med_stp3)),
+                  med_anova3$r.squared, .05)$power
+```
+```{r}  
+data_proj_cln = data_proj %>% #filter(gender==1) %>%
+                  as.matrix() %>% 
+                  as.data.frame() %>% 
+                  mutate_if(is.factor,function(f) as.numeric(levels(f))[f])
+
+mod1 = '# a path
+         years_bilingual ~ a * lang
+
+         # b path
+         EF ~ b * years_bilingual
+
+         # c prime path 
+         EF ~ cp * lang
+
+         # indirect and total effects
+         ab := a * b
+         total := cp + ab'
+
+sem1 = runMI(mod1, data = data_proj_cln,
+             miPackage = "mice", m=9,
+             fun="sem")
+summary(sem1, standardized = T, ci = T)
+```

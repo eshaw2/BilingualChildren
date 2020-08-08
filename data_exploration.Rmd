@@ -8,10 +8,10 @@ output: pdf_document
 ```{r setup, include=FALSE}
 library(dplyr)
 library(ggplot2)
-library(mice)
 
 setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/')
 data = read.csv('data_raw/RawData_unlocked.csv')
+data_numeric = read.csv('code/BilingualChildren/data/data_num.csv')
 
 # trace(psych::polychoric, edit=TRUE)
 ```
@@ -54,7 +54,7 @@ data_factor = data_clean %>%
                      brief_raw_inhibit = factor(brief_raw_inhibit, 
                                                 levels=c(seq(7,27),NA)),
                      brief_raw_self.monitor = factor(brief_raw_self.monitor,
-                                                      levels=c(seq(4,16),NA)),
+                                                      levels=c(seq(4,50),NA)),
                      brief_raw_shift = factor(brief_raw_shift,
                                               levels=c(seq(8,24),NA)),
                      brief_raw_emotional_control = factor(brief_raw_emotional_control,
@@ -87,15 +87,69 @@ data_numeric %>%
   select(contains("pvt"))
 
 # saveRDS(data_factor, file='data/data_fact.RDS')
-
-# ASD_data = data_clean %>% filter(diagnosis == 1)
-# TD_data = data_clean %>% filter(diagnosis == 0)
-# 
-# ASD_F_data = data_clean %>% filter(diagnosis == 1, gender == 1) # 16
-# ASD_M_data = data_clean %>% filter(diagnosis == 1, gender == 0) # 22
-# TD_F_data = data_clean %>% filter(diagnosis == 0, gender == 1) # 21
-# TD_M_data  = data_clean %>% filter(diagnosis == 0, gender == 0) # 30
 ```
+# Bilingualism
+```{r}
+data_numeric = read.csv('data/data_num.csv')
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(age_acquisition) %>%
+  tally()
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(where_english) %>%
+  tally()
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(where_english) %>%
+  tally()
+data_numeric %>% 
+  select(bilec_total_input,age_acquisition,where_english) %>% 
+  group_by(age_acquisition, where_english) %>%
+  tally()
+
+
+bilingual_df = data_numeric %>% 
+                select(diagnosis, bilec_total_input,age_acquisition,
+                       where_english,bilec_total_input) %>%
+                mutate(where_english = as.factor(where_english),
+                       diagnosis = as.factor(diagnosis),
+                       age_acquisition = as.factor(age_acquisition))
+
+ggplot(bilingual_df, aes(x=where_english,y=bilec_total_input,color=diagnosis)) +
+  geom_boxplot()
+ggplot(bilingual_df, aes(x=age_acquisition,y=bilec_total_input,color=diagnosis)) +
+  geom_boxplot()
+```
+
+## Gender + age
+```{r}
+demo_df = data_numeric %>% 
+              select(gender,diagnosis,age_m) %>%
+              mutate(diagnosis = as.factor(diagnosis),
+                     gender = as.factor(gender))
+
+ggplot(demo_df, aes(x=gender,y=age_m, color=diagnosis)) +
+  geom_boxplot()
+```
+
+# Language data screening
+```{r}
+lang_numeric = data_numeric %>% select(contains(c("vocab","bpvs")))  %>% na.omit()
+lang_numeric %>%
+  summarise_all(funs(sum(is.na(.))))
+
+lmtest::resettest(lang_numeric$vocabprocess_processing_speed_target ~ lang_numeric$bpvs_raw,
+                  power=2,
+                  type="regressor")$p.value
+lmtest::resettest(lang_numeric$bpvs_raw ~ lang_numeric$vocabprocess_processing_speed_target,
+                  power=2,
+                  type="regressor")$p.value
+
+GGally::ggpairs(lang_numeric, progress = F)
+```
+
+
 # EF data screening
 ```{r}
 EF_numeric = data_numeric %>% select(c(contains(c("brief","flanker","pvt"))),part_no)
@@ -111,6 +165,14 @@ EF_factor_cln = EF_factor %>%
                            replace(brief_raw_self.monitor, 
                                    brief_raw_self.monitor == 48,
                                    NA))
+
+outliers_df = bind_cols(EF_numeric,demo_df) %>% 
+                tidyr::pivot_longer(contains("brief"), 
+                                     names_to="subscale",
+                                     values_to="brief_score")
+ggplot(outliers_df, aes(x=diagnosis,y=brief_score,color=diagnosis)) +
+  geom_boxplot() +
+  facet_wrap(~subscale)
 ```
 ```{r}
 brief_complete = EF_numeric_cln %>% 
@@ -187,7 +249,7 @@ GGally::ggpairs(EF_complete_comb %>% select(-part_no),progress = F)
 ```
 ## Ramsey RESET test
 ```{r}
-EF_complete = EF_numeric_cln %>% na.omit() %>% select(-part_no)
+EF_complete = EF_numeric %>% na.omit() %>% select(-part_no)
 
 sig10_cols = as.data.frame(matrix(0, ncol = 2, nrow = 306))
 sig5_cols = as.data.frame(matrix(0, ncol = 2, nrow = 306))
@@ -210,11 +272,14 @@ for (i in 1:ncol(EF_complete)){
   }
 }
 
-sig10_cols %>% filter(V1>0) %>% arrange(V1,V2)
+write.csv(sig10_cols %>% dplyr::filter(V1>0) %>% arrange(V1,V2),
+          'data/corr_RESET_vars.csv',row.names = F)
+
+sig10_cols %>% dplyr::filter(V1>0) %>% arrange(V1,V2)
 sig5_cols %>% filter(V1>0) %>% arrange(V1,V2)
 
-sig10_cols %>% group_by(V1) %>% tally()
-sig10_cols %>% group_by(V2) %>% tally()
+# sig10_cols %>% group_by(V1) %>% tally()
+# sig10_cols %>% group_by(V2) %>% tally()
 ```
 ```{r}
 plot(x=EF_complete$flanker_mean_rt_incongruent, y=EF_complete$pvt_mean_rt)
@@ -225,180 +290,42 @@ plot(x=EF_complete$flanker_mean_rt_incongruent, y=EF_complete$pvt_mean_rt)
 library(fBasics)
 # Skew ≥2 and Kurtosis ≥7 affect Pearson corr.
 
-colSkewness(EF_complete) 
+colSkewness(EF_numeric %>% select(-part_no)) 
 # problem cols: pvt_count_falsestarts, flanker_percenterrors_congruent,
-#               pvt_mean_rt, pvt_mean_lapse_rt, pvt_count_falsestarts
-colKurtosis(EF_complete)
+#               pvt_mean_rt, pvt_mean_lapse_rt
+colKurtosis(EF_numeric %>% select(-part_no))
 # problem cols: flanker_percenterrors_congruent, pvt_mean_rt,
 #               pvt_mean_lapse_rt
+
+colSkewness(lang_numeric %>% select(-part_no))
+
+colKurtosis(lang_numeric %>% select(-part_no))
 ```
 
-## Polychoric/Polyserial corr
+## Reliability
 ```{r}
-source("func.R")
-ordinal_data = EF_numeric_cln %>% 
-                  na.omit() %>%
-                  select(c(contains(c("brief")),"pvt_number_of_lapses",
-                           "pvt_count_falsestarts"))
-  
-continuous_data = EF_numeric_cln %>% 
-                  na.omit() %>%
-                  select(c(contains(c("flanker")),"pvt_mean_rt",
-                           "pvt_mean_lapse_rt"))
+# G6 is also sensitive to lumpyness in the test and should not be taken as a measure of unifactorial structure. For lumpy tests, it will be greater than alpha. For tests with equal item loadings, alpha > G6, but if the loadings are unequal or if there is a general factor, G6 > alpha.
 
-ordinal_psych_output = psych::polychoric(ordinal_data)
-# saveRDS(ordinal_psych_output,'data/EF_ordinal_polycorr.RDS')
-ordinal_max_corr = find_max_corr(ordinal_data, ordinal_psych_output$rho)
-colnames(ordinal_max_corr$corr) = colnames(ordinal_data)
-rownames(ordinal_max_corr$corr) = colnames(ordinal_data)
+reliability_df = EF_numeric %>% mutate_all(funs(scale))
 
-cont_max_corr = find_max_corr(continuous_data)
-rownames(cont_max_corr$corr) = colnames(continuous_data)
-colnames(cont_max_corr$corr) = colnames(continuous_data)
+psych::alpha(reliability_df %>% select(contains("brief")))
+psych::alpha(EF_numeric %>% select(contains("flanker")))
+psych::alpha(reliability_df %>% select(contains("flanker")))
+psych::alpha(EF_numeric %>% select(contains("pvt")))
+psych::alpha(reliability_df %>% select(contains("pvt")))
 
-comb_psych_output = psych::polyserial(continuous_data,ordinal_data)
-cross_max_corr = find_max_corr(EF_numeric_cln %>% na.omit(), comb_psych_output)
-rownames(cross_max_corr$corr) = rownames(comb_psych_output)
-colnames(cross_max_corr$corr) = colnames(comb_psych_output)
-
-mix_cont_corr = bind_rows(cont_max_corr$corr, cross_max_corr$corr)
-mix_ord_corr = bind_cols(ordinal_max_corr$corr,cross_max_corr$corr)
-all_EF_corr = bind_rows(as.data.frame(t(mix_cont_corr)),mix_ord_corr)
-# write.csv(all_EF_corr,'data/all_EF_correlations.csv')
-all_EF_corr = read.csv('data/all_EF_correlations.csv') %>% select(-X)
+psych::alpha(EF_numeric %>% select(-part_no))
+psych::alpha(reliability_df %>% select(-part_no))
+psych::omega(EF_numeric %>% select(-part_no))
 ```
-
-## Missing Data explore
+# EFA appropriateness
 ```{r}
-non_SC_data = data_numeric %>% select(-contains(c("tom","et_")))
+unadj_corr = round(cor(EF_numeric %>% select(-part_no), use="pairwise.complete.obs", method="pearson"),2)
+# write.csv(unadj_corr,'tables/unadj_corr.csv')
 
-missing_recs = non_SC_data %>% select(-c(SCQ,part_no)) %>% filter_all(any_vars(is.na(.))) %>% select(-contains(c("brief","pvt","flanker")))
+sum(abs(unadj_corr) > .3 & unadj_corr!=1)/sum(unadj_corr!=1)
 
-mice::md.pattern(non_SC_data)
-
-mis_obj = VIM::aggr(non_SC_data, col=c('navyblue','yellow'),
-                    numbers=TRUE, sortVars=TRUE,
-                    cex.axis=.7,
-                    gap=3, ylab=c("Missing data","Pattern"))
-
-missing_cols = mis_obj$missings %>% filter(Count >0)
-```
-
-## Safe to assume Missing At Random?
-```{r}
-prop_missing_df = bind_rows(missing_recs %>% mutate(cohort="missing"), data_numeric %>% select(names(missing_recs)) %>% mutate(cohort="original")) 
-
-# org_ct = nrow(data_numeric)
-# miss_ct = nrow(missing_recs)
-# 
-# compare_prop = function(comb_df, col_name) {
-#   original = comb_df %>% filter(cohort=="original") %>% 
-#               group_by(!!sym(col_name), cohort) %>%
-#               summarise(n = n()) %>%
-#               mutate(freq = n / org_ct)
-#   missing = comb_df %>% filter(cohort=="missing") %>% 
-#               group_by(!!sym(col_name), cohort) %>%
-#               summarise(n = n()) %>%
-#               mutate(freq = n / miss_ct)
-#   ggplot(bind_rows(original,missing), aes(x=factor(!!sym(col_name)),y=freq,fill=cohort)) +
-#     geom_bar(stat='identity',position = "dodge2")
-# }
-#   
-# for (column in names(missing_recs)) {
-#   print(compare_prop(prop_missing_df, column))
-# }
-
-for (column in missing_cols$Variable) {
-  # print(lattice::histogram(~ gender | is.na(data_numeric[column]), 
-  #                          data = data_numeric,
-  #                          xlab = paste(column, ' + gender')))
-  print(lattice::histogram(~ age_m | is.na(data_numeric[column]),
-                           data = data_numeric,
-                           xlab = paste(column, ' + age')))
-  # print(lattice::histogram(~ diagnosis | is.na(data_numeric[column]),
-  #                          data = data_numeric,
-  #                          xlab = paste(column, ' + diagnosis')))
-}
-```
-
-## Multiple Imputation
-```{r}
-demo_data = data_factor %>% select(part_no, gender, age_m, diagnosis)
-EF_MDA = inner_join(demo_data,EF_factor_cln, by='part_no') %>% select(-part_no)
-
-MI_obj = mice::mice(EF_MDA, maxit=0)
-
-# Extract predictorMatrix and methods of imputation 
-pred_matrix = MI_obj$predictorMatrix
-# pred_matrix[,colnames(EF_factor_cln %>% select(-part_no))]=0
-pred_matrix[colnames(demo_data %>% select(-part_no)),]=0
-
-method = MI_obj$method
-method[colnames(ordinal_data)] = "polr"
-
-MI_results = mice(EF_MDA, maxit = 5, 
-             predictorMatrix = pred_matrix, 
-             method = method, print =  FALSE)
-
-# saveRDS(MI_results, file='data/MI_results.RDS')
-MI_results = readRDS('data/MI_results.RDS')
-
-# plot(MI_results)
-MI_results$imp
-
-all_MI_data = mice::complete(MI_results,action='long',include=F) %>%
-                mutate_if(is.factor,as.numeric)
-# write.csv(all_MI_data, 'data/MI_complete_data.csv', row.names=F)
-# all_MI_data = read.csv('data/MI_complete_data.csv')
-```
-
-```{r}
-source("func.R")
-IM_data1 = all_MI_data %>% filter(.imp==1) %>% select(-c(.imp,.id))
-IM_data2 = all_MI_data %>% filter(.imp==2) %>% select(-c(.imp,.id))
-IM_data3 = all_MI_data %>% filter(.imp==3) %>% select(-c(.imp,.id))
-IM_data4 = all_MI_data %>% filter(.imp==4) %>% select(-c(.imp,.id))
-IM_data5 = all_MI_data %>% filter(.imp==5) %>% select(-c(.imp,.id))
-
-data1_max_corr = data_max_corr(IM_data1)
-data2_max_corr = data_max_corr(IM_data2)
-data3_max_corr = data_max_corr(IM_data3)
-data4_max_corr = data_max_corr(IM_data4)
-data5_max_corr = data_max_corr(IM_data5)
-
-all_max_corr = bind_rows(data1_max_corr$corr %>% mutate(imp=1),
-                      data2_max_corr$corr %>% mutate(imp=2),
-                      data3_max_corr$corr %>% mutate(imp=3),
-                      data4_max_corr$corr %>% mutate(imp=4),
-                      data5_max_corr$corr %>% mutate(imp=5))
-
-# write.csv(all_max_corr, 'data/MI_max_corrs.csv',row.names = F)
-
-CC_corr_mean = colMeans(all_EF_corr)
-data1_corr_mean = colMeans(data1_max_corr$corr)
-data2_corr_mean = colMeans(data2_max_corr$corr)
-data3_corr_mean = colMeans(data3_max_corr$corr)
-data4_corr_mean = colMeans(data4_max_corr$corr)
-data5_corr_mean = colMeans(data5_max_corr$corr)
-
-rbind(CC_corr_mean,data1_corr_mean,data2_corr_mean,
-      data3_corr_mean,data4_corr_mean,data5_corr_mean)
-```
-
-## Assume ordinal is continuous, only fix skew/kurtosis
-```{r}
-source("func.R")
-data1_cons_corr = as.data.frame(data_cons_corr(IM_data1))
-data2_cons_corr = as.data.frame(data_cons_corr(IM_data2))
-data3_cons_corr = as.data.frame(data_cons_corr(IM_data3))
-data4_cons_corr = as.data.frame(data_cons_corr(IM_data4))
-data5_cons_corr = as.data.frame(data_cons_corr(IM_data5))
-
-all_cons_corr = bind_rows(data1_cons_corr %>% mutate(imp=1),
-                      data2_cons_corr %>% mutate(imp=2),
-                      data3_cons_corr %>% mutate(imp=3),
-                      data4_cons_corr %>% mutate(imp=4),
-                      data5_cons_corr %>% mutate(imp=5))
-
-# write.csv(all_cons_corr, 'data/MI_cons_corrs.csv',row.names = F)
+psych::cortest.bartlett(unadj_corr, n=89)
+unadj_kmo = psych::KMO(unadj_corr)
+write.csv(unadj_kmo$MSAi,'tables/unadj_kmo.csv')
 ```

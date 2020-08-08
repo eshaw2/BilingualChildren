@@ -75,9 +75,10 @@ data_max_corr = function(data_df) {
 data_cons_corr = function(data_df) {
   nnorm_df = data_df %>% 
               select("flanker_percenterrors_congruent","pvt_mean_rt",
-                      "pvt_mean_lapse_rt","pvt_count_falsestarts","brief_raw_initiate")
+                      "pvt_mean_lapse_rt","brief_raw_initiate")
   continuous_df = data_df %>%
-              select(c(contains(c("brief","flanker")),"pvt_number_of_lapses")) %>%
+              select(c(contains(c("brief","flanker")),"pvt_number_of_lapses",
+                       "pvt_count_falsestarts")) %>%
               select(-c("brief_raw_initiate","flanker_percenterrors_congruent"))
   
   spear_corr = cor(bind_cols(nnorm_df, continuous_df), method = "spearman")
@@ -85,4 +86,87 @@ data_cons_corr = function(data_df) {
   all_corr = spear_corr
   all_corr[rownames(cont_corr),colnames(cont_corr)] = cont_corr
   return(all_corr)
+}
+
+calc_projection = function(data_df, eigen_matrix, cg_process=NULL) {
+  eigen_ordered = eigen_matrix[order(rownames(eigen_matrix)),]
+  data_ordered = data_df[,order(colnames(data_df))]
+  
+  proj_data = as.matrix(data_ordered) %*% as.matrix(eigen_ordered)
+  if (cg_process == "EF"){
+    colnames(proj_data) = c("EF_Comp1","EF_Comp2","EF_Comp3")
+  }else if (cg_process == "lang"){
+    colnames(proj_data) = c("lang_Comp")
+  }
+  
+  return(proj_data)
+}
+
+project_data = function(data_df,EF_Evec,lang_Evec,demo_df){
+  EF_proj = calc_projection(data_df %>% select(contains(c("brief","flanker","pvt"))),
+                            EF_Evec,"EF")
+  lang_Evec = as.matrix(lang_Evec)
+  lang_proj = calc_projection(data_df %>% select(contains(c('vocab','bpvs'))), lang_Evec, "lang")
+  proj_data = bind_cols(demo_df,
+                         as_tibble(EF_proj) %>% mutate_all(funs(scale)),
+                         as_tibble(lang_proj) %>% mutate_all(funs(scale))
+              )
+  return(proj_data)
+}
+
+calc_power = function(lm_result,alpha) {
+  n = 89
+  r2 = summary(lm_result)$r.squared
+  return(pwr.f2.test(u = length(lm_result$coefficients)-1, 
+                     v = n-(length(lm_result$coefficients)-1), 
+                     f2 = r2/(1-r2), 
+                     sig.level = alpha))
+}
+
+rename_ef_cols = function(ef_df) {
+  return( ef_df %>% mutate( BIH = brief_raw_inhibit,
+                            BSM = brief_raw_self.monitor,
+                            BS = brief_raw_shift,
+                            BEC = brief_raw_emotional_control,
+                            BIT = brief_raw_initiate,
+                            BWM = brief_raw_working_memory,
+                            BPO = brief_raw_plan_organise,
+                            BTM = brief_raw_task_monitor,
+                            BOM = brief_raw_organisation_of_materials,
+                            FCE = flanker_percenterrors_congruent,
+                            FIE = flanker_percenterrors_incongruent,
+                            FCR = flanker_mean_rt_congruent,
+                            FIR = flanker_mean_rt_incongruent,
+                            PBR = pvt_mean_rt,
+                            PLC = pvt_number_of_lapses,
+                            PLR = pvt_mean_lapse_rt,
+                            PFC = pvt_count_falsestarts)
+    
+  )
+}
+
+project_data_report = function(data_df,EF_Evec,lang_Evec,demo_df){
+  EF_data = data_df %>%
+              select(BPO,BS,BWM, BIT, BSM, BIH, BTM)
+  EF_proj = calc_projection_report(EF_data, EF_Evec, "EF")
+  lang_Evec = as.matrix(lang_Evec)
+  lang_proj = calc_projection_report(data_df %>% select(contains(c('vocab','bpvs'))), lang_Evec, "lang")
+  proj_data = bind_cols(demo_df,
+                        as_tibble(EF_proj) %>% mutate_all(funs(scale)),
+                        as_tibble(lang_proj) %>% mutate_all(funs(scale))
+                          )
+  return(proj_data)
+}
+
+calc_projection_report = function(data_df, eigen_matrix, col_name) {
+  proj_data = as.matrix(data_df) %*% as.matrix(eigen_matrix)
+  colnames(proj_data) = c(col_name)
+  
+  return(proj_data)
+}
+calc_power_report = function(n,params,r2,alpha) {
+  return(pwr.f2.test(u = params, 
+                     v = n-params-1, 
+                     f2 = r2/(1-r2), 
+                     sig.level = alpha))
 }

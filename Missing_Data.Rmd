@@ -1,0 +1,306 @@
+---
+title: "Missing Data"
+author: "Elena Shaw"
+date: "20/07/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(mice)
+
+setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+
+data_numeric = read.csv('data/data_num.csv') %>%
+                mutate(part_no = as.factor(part_no))
+data_factor = readRDS('data/data_fact.RDS') %>%
+                mutate(part_no = as.factor(part_no)) 
+
+EF_numeric = data_numeric %>% select(c(contains(c("brief","flanker","pvt")),part_no))
+EF_factor = data_factor %>% select(c(contains(c("brief","flanker","pvt")),part_no))
+lang_numeric = data_numeric %>% select(contains(c("vocab","bpvs")), part_no) 
+EF_numeric_cln = EF_numeric %>%
+                  mutate(brief_raw_self.monitor = 
+                           replace(brief_raw_self.monitor, 
+                                   brief_raw_self.monitor == 48,
+                                   NA))
+EF_factor_cln = EF_factor %>%
+                  mutate(brief_raw_self.monitor = 
+                           replace(brief_raw_self.monitor, 
+                                   brief_raw_self.monitor == 48,
+                                   NA))
+
+nonnorm_vars = c('brief_raw_self.monitor',
+                 'flanker_percenterrors_congruent',
+                 'pvt_count_falsestarts',
+                 'pvt_mean_lapse_rt','pvt_mean_rt')
+# trace(psych::polychoric, edit=TRUE)
+```
+
+## Missing Data explore
+```{r}
+non_SC_data = data_numeric %>% select(-contains(c("tom")))
+
+mice::md.pattern(non_SC_data)
+
+mis_obj = VIM::aggr(non_SC_data, col=c('navyblue','yellow'),
+                    numbers=TRUE, sortVars=TRUE,
+                    cex.axis=.7,
+                    gap=3, ylab=c("Missing data","Pattern"))
+
+missing_cols = mis_obj$missings %>% filter(Count >0)
+```
+
+## Safe to assume Missing At Random?
+```{r}
+missing_recs = non_SC_data %>% select(-c(SCQ,part_no)) %>% filter_all(any_vars(is.na(.))) %>% select(-starts_with(c("B_","F_","P_")))
+
+prop_missing_df = bind_rows(missing_recs %>% mutate(cohort="missing"), data_numeric %>% select(names(missing_recs)) %>% mutate(cohort="original")) 
+
+# org_ct = nrow(data_numeric)
+# miss_ct = nrow(missing_recs)
+# 
+# compare_prop = function(comb_df, col_name) {
+#   original = comb_df %>% filter(cohort=="original") %>% 
+#               group_by(!!sym(col_name), cohort) %>%
+#               summarise(n = n()) %>%
+#               mutate(freq = n / org_ct)
+#   missing = comb_df %>% filter(cohort=="missing") %>% 
+#               group_by(!!sym(col_name), cohort) %>%
+#               summarise(n = n()) %>%
+#               mutate(freq = n / miss_ct)
+#   ggplot(bind_rows(original,missing), aes(x=factor(!!sym(col_name)),y=freq,fill=cohort)) +
+#     geom_bar(stat='identity',position = "dodge2")
+# }
+#   
+# for (column in names(missing_recs)) {
+#   print(compare_prop(prop_missing_df, column))
+# }
+
+for (column in missing_cols$Variable) {
+  # print(lattice::histogram(~ gender | is.na(data_numeric[column]),
+  #                          data = data_numeric,
+  #                          xlab = paste(column, ' + gender')))
+  # print(lattice::histogram(~ age_m | is.na(data_numeric[column]),
+  #                          data = data_numeric,
+  #                          xlab = paste(column, ' + age')))
+  print(lattice::histogram(~ diagnosis | is.na(data_numeric[column]),
+                           data = data_numeric,
+                           xlab = paste(column, ' + diagnosis')))
+}
+```
+
+## Multiple Imputation: missing only
+```{r}
+# data_clean %>%
+#   summarise_all(funs(sum(is.na(.)))) %>%
+#   select(contains("brief"))
+
+ordinal_data = EF_numeric %>% 
+                  select(c(starts_with("B_"),"pvt_number_of_lapses",
+                           "pvt_count_falsestarts"))
+
+demo_data = data_factor %>% select(part_no, gender, age_m, diagnosis)
+EF_MDA = inner_join(demo_data,EF_numeric, by='part_no')
+all_MDA = inner_join(EF_MDA,lang_numeric, by='part_no') %>% select(-part_no)
+
+MI_obj = mice::mice(all_MDA, maxit=0)
+
+# Extract predictorMatrix and methods of imputation 
+pred_matrix = MI_obj$predictorMatrix
+# pred_matrix[,colnames(EF_factor %>% select(-part_no))]=0
+pred_matrix[colnames(demo_data %>% select(-part_no)),]=0
+
+method = MI_obj$method
+method[colnames(ordinal_data)] = "pmm"
+method["bpvs_raw"] = "pmm"
+
+MI_results = mice(all_MDA, maxit = 5, 
+             predictorMatrix = pred_matrix, 
+             method = method, print =  FALSE)
+
+# saveRDS(MI_results, file='data/MI_results_full.RDS')
+# MI_results = readRDS('data/MI_results_full.RDS')
+
+# plot(MI_results)
+MI_results$imp$brief_raw_self.monitor
+
+MI_data_full = mice::complete(MI_results,action='long',include=F) %>%
+                mutate_if(is.factor,function(f) as.numeric(levels(f))[f])
+
+# write.csv(MI_data_full,'data/MI_complete_data.csv', row.names=F)
+# MI_data_full = read.csv('data/MI_complete_data.csv')
+
+MI1_full = MI_data_full %>% filter(.imp==1) %>% select(-c(.imp,.id))
+MI2_full = MI_data_full %>% filter(.imp==2) %>% select(-c(.imp,.id))
+MI3_full = MI_data_full %>% filter(.imp==3) %>% select(-c(.imp,.id))
+MI4_full = MI_data_full %>% filter(.imp==4) %>% select(-c(.imp,.id))
+MI5_full = MI_data_full %>% filter(.imp==5) %>% select(-c(.imp,.id))
+
+psych::cortest.bartlett(MI1_full)
+MSA_full = bind_rows(psych::KMO(MI1_full)$MSAi, psych::KMO(MI2_full)$MSAi,
+                      psych::KMO(MI3_full)$MSAi, psych::KMO(MI4_full)$MSAi,
+                      psych::KMO(MI5_full)$MSAi
+                    )
+colMeans(MSA_full)
+```
+
+## Multiple Imputation: replace outlier
+```{r}
+EF_MDA2 = inner_join(demo_data,EF_numeric_cln, by='part_no')
+all_MDA2 = inner_join(EF_MDA2,lang_numeric, by='part_no') %>% select(-part_no)
+
+MI_obj2 = mice::mice(all_MDA2, maxit=0)
+
+# Extract predictorMatrix and methods of imputation 
+pred_matrix = MI_obj2$predictorMatrix
+pred_matrix[colnames(demo_data %>% select(-part_no)),]=0
+
+method = MI_obj2$method
+method[colnames(ordinal_data)] = "pmm"
+method["bpvs_raw"] = "pmm"
+
+MI_rm = mice(all_MDA2, maxit = 5, 
+             predictorMatrix = pred_matrix, 
+             method = method, print =  FALSE)
+
+# saveRDS(MI_rm, file='data/MI_results_rm.RDS')
+# MI_rm = readRDS('data/MI_results_rm.RDS')
+
+# plot(MI_results)
+MI_rm$imp$brief_raw_self.monitor
+
+MI_data_rm = mice::complete(MI_rm,action='long',include=F) %>%
+                mutate_if(is.factor,function(f) as.numeric(levels(f))[f])
+
+# write.csv(MI_data_rm, 'data/MI_complete_out_rm.csv', row.names=F)
+# MI_data_rm = read.csv('data/MI_complete_out_rm.csv')
+
+MI1_rm = MI_data_rm %>% filter(.imp==1) %>% select(-c(.imp,.id))
+MI2_rm = MI_data_rm %>% filter(.imp==2) %>% select(-c(.imp,.id))
+MI3_rm = MI_data_rm %>% filter(.imp==3) %>% select(-c(.imp,.id))
+MI4_rm = MI_data_rm %>% filter(.imp==4) %>% select(-c(.imp,.id))
+MI5_rm = MI_data_rm %>% filter(.imp==5) %>% select(-c(.imp,.id))
+
+psych::cortest.bartlett(MI1_rm)
+MSA_rm = bind_rows(psych::KMO(MI1_rm)$MSAi, psych::KMO(MI2_rm)$MSAi,
+                    psych::KMO(MI3_rm)$MSAi, psych::KMO(MI4_rm)$MSAi,
+                    psych::KMO(MI5_rm)$MSAi
+                  )
+colMeans(MSA_rm)
+```
+
+## Reliability
+```{r}
+MIx_full_std = MI_data_full %>% filter(.imp==1) %>% mutate_all(funs(scale))
+MIx_rm_std = MI_data_rm %>% filter(.imp==1) %>% mutate_all(funs(scale))
+
+psych::alpha(MIx_full_std %>% select(contains("brief")))
+psych::alpha(MIx_rm_std %>% select(contains("brief")))
+
+psych::alpha(MIx_full_std %>% select(contains("flanker")) %>% mutate_all(funs(scale)))
+psych::alpha(MIx_rm_std %>% select(contains("flanker")) %>% mutate_all(funs(scale)))
+
+psych::alpha(MIx_full_std %>% select(contains("pvt")) %>% mutate_all(funs(scale)))
+psych::alpha(MIx_rm_std %>% select(contains("pvt")) %>% mutate_all(funs(scale)))
+
+psych::alpha(MIx_full_std %>% select(contains(c("brief","flanker","pvt"))))
+psych::alpha(MIx_rm_std %>% select(contains(c("brief","flanker","pvt"))))
+
+psych::omega(MIx_full %>% select(contains(c("brief","flanker","pvt"))))
+psych::omega(MIx_rm_std %>% select(contains(c("brief","flanker","pvt"))))
+
+userfriendlyscience::scaleDiagnosis(MIx_full %>% select(contains(c("brief","flanker","pvt"))))
+userfriendlyscience::scaleDiagnosis(MIx_rm %>% select(contains(c("brief","flanker","pvt"))))
+```
+
+## pooled correlation: full
+```{r}
+EF_ind = which(names(MI_data_full) %in% names(EF_numeric))
+
+MI_pearson_full = miceadds::micombine.cor(mi.res=MI_data_full, 
+                        variables=EF_ind,
+                        method="pearson" )
+comb_corr_full = attr(MI_pearson_full, "r_matrix")
+
+MI_spearman_full = miceadds::micombine.cor(mi.res=MI_data_full, 
+                        variables=EF_ind,
+                        method="spearman" )
+spearman_corr_full = attr(MI_spearman_full, "r_matrix")
+
+
+# correct for non-linear variables
+nonlin_vars = read.csv('data/corr_RESET_vars.csv')
+
+for (i in 1:nrow(nonlin_vars)) {
+  comb_corr_full[nonlin_vars[i,]$V1,nonlin_vars[i,]$V2] = spearman_corr_full[nonlin_vars[i,]$V1,nonlin_vars[i,]$V2]
+  comb_corr_full[nonlin_vars[i,]$V2,nonlin_vars[i,]$V1] = spearman_corr_full[nonlin_vars[i,]$V2,nonlin_vars[i,]$V1]
+}
+
+# correct for non-normal variables
+nonnorm_vars = c('brief_raw_self.monitor',
+                 'flanker_percenterrors_congruent',
+                 'pvt_count_falsestarts',
+                 'pvt_mean_lapse_rt','pvt_mean_rt')
+
+for (j in 1:length(nonnorm_vars)) {
+  comb_corr_full[j,] = spearman_corr_full[j,]
+  comb_corr_full[,j] = spearman_corr_full[,j]
+}
+
+# write.csv(comb_corr_full,'data/MI_corrs_full.csv', row.names = F)
+```
+
+## pooled correlation: outlier removed
+```{r}
+# EF
+EF_ind = which(names(MI_data_rm) %in% names(EF_numeric))
+
+MI_pearson_rm = miceadds::micombine.cor(mi.res=MI_data_rm, 
+                        variables=EF_ind,
+                        method="pearson" )
+comb_corr_rm = attr(MI_pearson_rm, "r_matrix")
+
+MI_spearman_rm = miceadds::micombine.cor(mi.res=MI_data_rm, 
+                        variables=EF_ind,
+                        method="spearman" )
+spearman_corr_rm = attr(MI_spearman_rm, "r_matrix")
+
+
+# correct for non-linear variables
+for (i in 1:nrow(nonlin_vars)) {
+  comb_corr_rm[nonlin_vars[i,]$V1,nonlin_vars[i,]$V2] = spearman_corr_rm[nonlin_vars[i,]$V1,nonlin_vars[i,]$V2]
+  comb_corr_rm[nonlin_vars[i,]$V2,nonlin_vars[i,]$V1] = spearman_corr_rm[nonlin_vars[i,]$V2,nonlin_vars[i,]$V1]
+}
+
+# correct for non-normal variables
+for (j in 1:length(nonnorm_vars)) {
+  comb_corr_rm[j,] = spearman_corr_rm[j,]
+  comb_corr_rm[,j] = spearman_corr_rm[,j]
+}
+
+# write.csv(comb_corr_rm,'data/MI_corrs_rm.csv', row.names = F)
+```
+
+# pooled correlation: Language
+```{r}
+# Lang
+lang_ind = which(names(MI_data_rm) %in% names(lang_numeric))
+
+
+MI_lang_corr = miceadds::micombine.cor(mi.res=MI_data_rm,
+                        variables=lang_ind,
+                        method="pearson" )
+lang_corr = attr(lang_corr, "r_matrix")
+write.csv(lang_corr,'data/lang_corr.csv', row.names = F)
+# 
+# lmtest::resettest(lang_numeric$vocabprocess_processing_speed_target ~ lang_numeric$bpvs_raw,
+#                   power=2,
+#                   type="regressor")$p.value
+# lmtest::resettest(lang_numeric$bpvs_raw ~ lang_numeric$vocabprocess_processing_speed_target,
+#                   power=2,
+#                   type="regressor")$p.value
+
+
+```

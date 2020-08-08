@@ -1,0 +1,442 @@
+---
+title: "Mediation"
+author: "Elena Shaw"
+date: "18/07/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(lavaan)
+library(foreign)
+library(dplyr)
+library(ggplot2)
+library(pwr)
+
+setwd('/Users/elenashaw/Documents/UoE/Dissertation/BilingualChildren/code/BilingualChildren/')
+
+demo_data = read.csv('data/data_num.csv')  %>% 
+              select(gender, age_m, diagnosis, SCQ,
+               bilec_total_input, age_acquisition, where_english) %>%
+              mutate(age = age_m/12,
+                     years_bilingual = (age - age_acquisition)*bilec_total_input,
+                     year_bi_std = scale(years_bilingual)
+                     )
+MI_full = read.csv('data/MI_complete_data.csv') %>% select(-c(gender,age_m,diagnosis))
+# MI_rm = read.csv('data/MI_complete_out_rm.csv') %>% select(-c(gender,age_m,diagnosis))
+
+MI1_full = MI_full %>% filter(.imp==1)
+```
+## project data (PCA)
+```{r}
+source("func.R")
+EF_Evecs = readRDS('data/cons_Evec_full.rds')
+# EF_Evecs = readRDS('data/cons_Evec_rm.rds')
+lang_Evecs = readRDS('data/lang_Evec.rds')
+
+proj1_full = project_data(MI1_full,EF_Evecs$data1,lang_Evecs$data1,demo_data)
+# proj1_rm = project_data(MI1_rm,EF_Evecs$data1,lang_Evecs$data1,demo_data)
+
+
+proj2_full = project_data(MI2_full,EF_Evecs$data2,lang_Evecs$data2,demo_data)
+# proj2_rm = project_data(MI2_rm,EF_Evecs$data2,lang_Evecs$data2,demo_data)
+```
+
+## Moderation:YSB
+```{r}
+df1 = proj1_full %>%
+      tidyr::pivot_longer(c(EF_Comp1,EF_Comp2),names_to="EFComp",values_to="EF") %>%
+      mutate(diagnosis = as.factor(diagnosis),
+             gender = as.factor(gender),
+              mod_bil = EF * years_bilingual,
+              mod_age = EF * age,
+              )
+ggplot(df1, aes(x=diagnosis,y=EF,color=diagnosis)) +
+  geom_boxplot() +
+  facet_wrap(~ EFComp)
+ggplot(df1, aes(x=years_bilingual,y=EF,color=diagnosis)) +
+  geom_point() +
+  geom_smooth(method = "lm", alpha = .15, aes(fill = diagnosis)) +
+  facet_wrap(~ EFComp)
+ggplot(df1, aes(x=years_bilingual,y=EF,color=diagnosis)) +
+  geom_point() +
+  geom_smooth(formula = 'y ~ poly(x,2)',
+              method = "lm", alpha = .15, aes(fill = diagnosis)) +
+  facet_wrap(~ EFComp)
+```
+```{r}
+proj_data1 = proj1_full
+effect_size_diag = cohen.d(proj_data1, "diagnosis")
+effect_size_gender = cohen.d(proj_data1, "gender")
+
+t.test(proj_data1$EF_Comp1 ~ proj_data1$diagnosis)
+pwr.t.test(n = 89, 
+           d = effect_size_diag$cohen.d["EF_Comp1","effect"], 
+           sig.level = 0.05)
+
+t.test(proj_data1$EF_Comp2 ~ proj_data1$diagnosis)
+pwr.t.test(n = 89, 
+           d = effect_size_diag$cohen.d["EF_Comp2","effect"], 
+           sig.level = 0.05)
+```
+Conclusion:
+- means are meaningfully difference for EF1 (power = 93.7%), so modeling for EF1 should have separate intercepts
+- means are not meaningfully difference for EF2
+```{r}
+source('func.R')
+proj_data1 = proj1_full
+
+# # Does centering make it sig?
+# ysb_mo0 = lm(proj_data1$EF_Comp2 ~ proj_data1$diagnosis)
+# summary(ysb_mo0)
+# ysb_mo1 = lm(proj_data1$EF_Comp2 ~ proj_data1$diagnosis + proj_data1$diagnosis:proj_data1$year_bi_std)
+# summary(ysb_mo1)
+# ysb_mo2 = lm(proj_data1$EF_Comp2 ~ proj_data1$diagnosis + proj_data1$diagnosis:proj_data1$years_bilingual)
+# summary(ysb_mo2)
+
+# EF1
+ysb_mo1 = lm(proj_data1$EF_Comp1 ~ proj_data1$diagnosis + poly(proj_data1$years_bilingual,2):proj_data1$diagnosis)
+summary(ysb_mo1)
+calc_power(ysb_mo1,.05)$power
+
+ysb_mo2 = lm(proj_data1$EF_Comp1 ~ proj_data1$diagnosis + proj_data1$years_bilingual:proj_data1$diagnosis)
+summary(ysb_mo2)
+calc_power(ysb_mo2,.05)$power
+
+# EF2
+ysb_mo3 = lm(proj_data1$EF_Comp2 ~ proj_data1$diagnosis + poly(proj_data1$years_bilingual,2):proj_data1$diagnosis)
+summary(ysb_mo3)
+calc_power(ysb_mo3,.05)$power
+
+ysb_mo4 = lm(proj_data1$EF_Comp2 ~ proj_data1$diagnosis + proj_data1$years_bilingual:proj_data1$diagnosis)
+summary(ysb_mo4)
+calc_power(ysb_mo4,.05)$power
+
+# SCQ
+TD_data = proj_data1 %>% filter(diagnosis==0)
+scq_mo1 = lm(TD_data$EF_Comp2 ~ TD_data$SCQ + TD_data$SCQ:TD_data$years_bilingual)
+summary(scq_mo1)
+calc_power(scq_mo1,.05)$power
+```
+## Moderation + gender
+```{r}
+ggplot(df1, aes(x=diagnosis,y=EF,color=gender)) +
+  geom_boxplot() +
+  facet_wrap(~ EFComp)
+ggplot(df1, aes(x=years_bilingual,y=EF,color=gender)) +
+  geom_point() +
+  geom_smooth(method = "lm", alpha = .15, aes(fill = gender)) +
+  facet_wrap(~ EFComp)
+ggplot(df1, aes(x=years_bilingual,y=EF,color=gender)) +
+  geom_point() +
+  geom_smooth(formula = 'y ~ poly(x,2)',
+              method = "lm", alpha = .15, aes(fill = gender)) +
+  facet_wrap(~ EFComp)
+
+t.test(proj_data1$EF_Comp1 ~ proj_data1$gender)
+pwr.t.test(n = 89, 
+           d = effect_size_gender$cohen.d["EF_Comp1","effect"], 
+           sig.level = 0.05)
+
+t.test(proj_data1$EF_Comp2 ~ proj_data1$gender)
+pwr.t.test(n = 89, 
+           d = effect_size_gender$cohen.d["EF_Comp2","effect"], 
+           sig.level = 0.05)
+```
+Conclusion:
+- there is no meaningful difference in EF1 or EF2 for girls vs. boys. Therefore, should not have separate intecepts (i.e. gender should not be a covariate)
+```{r}
+
+ysb_mo5 = lm(proj_data1$EF_Comp1 ~ proj_data1$diagnosis + proj_data1$diagnosis:proj_data1$gender + proj_data1$years_bilingual:proj_data1$diagnosis)
+summary(ysb_mo5)
+calc_power(ysb_mo5,.05)$power
+
+ysb_mo6 = lm(proj_data1$EF_Comp2 ~ proj_data1$diagnosis + proj_data1$diagnosis:proj_data1$gender + proj_data1$years_bilingual:proj_data1$diagnosis)
+summary(ysb_mo6)
+calc_power(ysb_mo6,.05)$power
+
+# Segmentation
+# EF1
+seg_data1 = proj_data1 %>% filter(gender==0)
+seg_mo1 = lm(seg_data1$EF_Comp1 ~ seg_data1$diagnosis + seg_data1$years_bilingual:seg_data1$diagnosis)
+summary(seg_mo1)
+calc_power(seg_mo1,.05)$power
+
+seg_data2 = proj_data1 %>% filter(gender==1)
+seg_mo2 = lm(seg_data2$EF_Comp1 ~ seg_data2$diagnosis + seg_data2$years_bilingual:seg_data2$diagnosis)
+summary(seg_mo2)
+calc_power(seg_mo2,.05)$power
+
+#EF2
+seg_mo3 = lm(seg_data1$EF_Comp2 ~ seg_data1$diagnosis + seg_data1$years_bilingual:seg_data1$diagnosis)
+summary(seg_mo3)
+calc_power(seg_mo3,.05)$power
+
+seg_mo4 = lm(seg_data2$EF_Comp2 ~ seg_data2$diagnosis + seg_data2$years_bilingual:seg_data2$diagnosis)
+summary(seg_mo4)
+calc_power(seg_mo4,.05)$power
+```
+Conclusion:
+- No strong evidence that boys and girls differ (too low power)
+
+## Mediation: language skills
+```{r}
+ggplot(df1, aes(x=diagnosis,y=lang_Comp,color=gender)) +
+  geom_boxplot()
+ggplot(df1, aes(x=lang_Comp,y=EF,color=gender)) +
+  geom_point() +
+  geom_smooth(method = "lm", alpha = .15, aes(fill = gender)) +
+  facet_wrap(~ EFComp)
+ggplot(df1, aes(x=lang_Comp,y=EF,color=gender)) +
+  geom_point() +
+  geom_smooth(formula = 'y ~ poly(x,2)',
+              method = "lm", alpha = .15, aes(fill = gender)) +
+  facet_wrap(~ EFComp)
+
+
+t.test(proj_data1$lang_Comp ~ proj_data1$diagnosis)
+pwr.t.test(n = 89, 
+           d = effect_size_diag$cohen.d["lang_Comp","effect"], 
+           sig.level = 0.05)
+
+t.test(proj_data1$lang_Comp ~ proj_data1$gender)
+pwr.t.test(n = 89, 
+           d = effect_size_gender$cohen.d["lang_Comp","effect"], 
+           sig.level = 0.05)
+```
+Conlcusion:
+- there is no evidence to suggest there is language difference by gender or by diagnosis (the power is also tiny)
+
+## Mediation Model, Step 1:
+```{r}
+proj_data1 = proj1_full
+
+total_effect1 = lm(proj_data1$EF_Comp1 ~ proj_data1$lang_Comp)
+summary(total_effect1)
+calc_power(total_effect1,.05)$power
+
+total_effect2 = lm(proj_data1$EF_Comp2 ~ proj_data1$lang_Comp)
+summary(total_effect2)
+calc_power(total_effect2,.05)$power
+
+
+# # Moderated?
+# t-test suggests not
+# total_effect3 = lm(proj_data1$EF_Comp1 ~ proj_data1$lang_Comp +  proj_data1$lang_Comp:proj_data1$diagnosis)
+# summary(total_effect3)
+# calc_power(total_effect1,.05)$power
+# 
+# total_effect4 = lm(proj_data1$EF_Comp2 ~ proj_data1$lang_Comp +   proj_data1$lang_Comp:proj_data1$diagnosis)
+# summary(total_effect4)
+# calc_power(total_effect1,.05)$power
+
+# # Segmentation
+# seg_data1 = proj_data1 %>% filter(gender==0)
+# total_seg1 = lm(seg_data1$EF_Comp1 ~ seg_data1$lang_Comp)
+# summary(total_seg1)
+# calc_power(total_seg1,.05)$power
+# 
+# seg_data2 = proj_data1 %>% filter(gender==1)
+# total_seg2 = lm(seg_data2$EF_Comp1 ~ seg_data2$lang_Comp)
+# summary(total_seg2)
+# calc_power(total_seg2,.05)$power
+```
+
+Conclusions:
+1) full data set
+- EF1 and EF2 somewhat predicted by vocab test (power: ~63%)
+  - neither are likely moderated by diagnosis (low power)
+  - neither are likely different by gender or diagnosis (low sig. & power)
+
+2) outlier removed
+- Brief tests (EF1) well predicted by vocab test (for gender & **ASD**)
+  - ** Brief tests (EF1) somewhat predicted by TD vocab test
+- Flanker tests (EF2) somewhat predicted by vocab test (for both gender & diagnosis)
+
+- overall moderation by diagnosis? (but NOT moderated mediation)
+
+## Mediation Model, Step 2:
+```{r}
+proj_data1 = proj1_full
+
+mediator = lm(proj_data1$years_bilingual ~ proj_data1$lang_Comp)
+summary(mediator)
+calc_power(mediator,.05)$power
+
+# moderated: gender
+mediator_gender = lm(proj_data1$years_bilingual ~ proj_data1$lang_Comp + proj_data1$gender:proj_data1$lang_Comp)
+summary(mediator_gender)
+calc_power(mediator_gender,.05)$power
+
+# moderated: diagnosis
+mediator_diag = lm(proj_data1$years_bilingual ~ proj_data1$lang_Comp + proj_data1$diagnosis:proj_data1$lang_Comp)
+summary(mediator_diag)
+calc_power(mediator_diag,.05)$power
+
+# Segmentation
+# seg_data1 = proj_data1 %>% filter(diagnosis==0)
+# mediator_seg1 = lm(seg_data1$years_bilingual ~ seg_data1$lang_Comp)
+# summary(mediator_seg1)
+# calc_power(mediator_seg1,.05)$power
+# 
+# seg_data2 = proj_data1 %>% filter(diagnosis==1)
+# mediator_seg2 = lm(seg_data2$years_bilingual ~ seg_data2$lang_Comp)
+# summary(mediator_seg2)
+# calc_power(mediator_seg2,.05)$power
+
+proj_data2 = proj2_full
+mediator = lm(proj_data2$years_bilingual ~ proj_data2$lang_Comp)
+summary(mediator)
+calc_power(mediator,.05)$power
+
+proj_data3 = proj3_full
+mediator = lm(proj_data3$years_bilingual ~ proj_data3$lang_Comp)
+summary(mediator)
+calc_power(mediator,.05)$power
+
+proj_data4 = proj4_full
+mediator = lm(proj_data4$years_bilingual ~ proj_data4$lang_Comp)
+summary(mediator)
+calc_power(mediator,.05)$power
+
+proj_data5 = proj5_full
+mediator = lm(proj_data5$years_bilingual ~ proj_data5$lang_Comp)
+summary(mediator)
+calc_power(mediator,.05)$power
+```
+Conclusions:
+1) full data set
+- language ability is potentially a predictor of YSB, but low power
+  - but unlikely moderated by either diagnosis or gender (power ~48%)
+  - not likely different by gender or diagnosis (insig. + low power)
+2) outlier removed
+- language test is good predictor of bilingualism as measured by YSB but NOT TBI
+- ? ASD language performance is more significant than TD in predicting bilingualism
+- ** exists gender difference: boys language performance sig. predicts bilingualism
+  - (boys language performance remains significant when moderated by age)
+  - (boys language performance remains significant when moderated by diagnosis)
+- ** Not moderated by gender or diagnosis
+
+## Mediation Model, Step 3 (unmoderated):
+```{r}
+proj_data1 = proj1_full
+
+dep_var1 = lm(proj_data1$EF_Comp1 ~ proj_data1$lang_Comp + proj_data1$years_bilingual)
+summary(dep_var1)
+calc_power(dep_var1,.10)$power
+
+dep_var2 = lm(proj_data1$EF_Comp2 ~ proj_data1$lang_Comp + proj_data1$years_bilingual)
+summary(dep_var2)
+calc_power(dep_var2,.05)$power
+```
+Conclusion:
+1) full data set
+- EF1 may be slightly mediated (p = .06, power=.83)
+- EF2 may be slightly mediated (p = .04, power=.77/.86)
+2) outlier removed
+- bilingualism is NOT a good mediator between language and EF performance
+
+## Mediation Model, step 3 (moderated):
+```{r}
+proj_data1 = proj1_full
+
+mod_med1 = lm(proj_data1$EF_Comp1 ~ proj_data1$lang_Comp + + proj_data1$diagnosis*proj_data1$year_bi_std)
+summary(mod_med1)
+calc_power(mod_med1,.1)$power
+
+mod_med2 = lm(proj_data1$EF_Comp2 ~ proj_data1$lang_Comp + proj_data1$year_bi_std*proj_data1$diagnosis)
+summary(mod_med2)
+calc_power(mod_med2,.1)$power
+
+mod_med3 = lm(proj_data1$EF_Comp1 ~ proj_data1$lang_Comp + proj_data1$gender*proj_data1$year_bi_std)
+summary(mod_med3)
+calc_power(mod_med3,.1)$power
+
+mod_med4 = lm(proj_data1$EF_Comp2 ~ proj_data1$lang_Comp + proj_data1$year_bi_std*proj_data1$gender)
+summary(mod_med4)
+calc_power(mod_med4,.05)$power
+
+mod_med5 = lm(proj_data1$EF_Comp2 ~ proj_data1$lang_Comp + proj_data1$year_bi_std*proj_data1$diagnosis + proj_data1$year_bi_std*proj_data1$gender)
+summary(mod_med5)
+calc_power(mod_med5,.1)$power
+```
+Conclusion:
+1) full data set
+- diagnosis may be a moderator for std_YSB mediating on EF1 (p:.07, power:82%) and EF2 (p:.07, power: 83%)
+- gender may also be moderator for std_YSB mediating on EF1 (p:.05, power:84%) and EF2 (p:.03, power: 79%/87%)
+
+2) outlier removed
+- No moderated mediation
+
+## Step 4:
+```{r}
+med = psych::mediate(EF_Comp1 ~ lang_Comp + (year_bi_std),
+              data=proj_data1,
+              n.iter = 10000)
+summary(med)
+
+mod_med = psych::mediate(EF_Comp1 ~ lang_Comp + diagnosis + (year_bi_std),
+              data=proj_data1,
+              n.iter = 10000)
+summary(mod_med)
+```
+## Lavaan
+```{r}
+set.seed(1)
+
+mod_EF1 = "# a path
+         year_bi_std ~ a * lang_Comp
+
+         # b path
+         EF_Comp1 ~ b * year_bi_std
+
+         # c prime path 
+         EF_Comp1 ~ cp * lang_Comp
+
+         # indirect and total effects
+         ab := a * b
+         total := cp + ab"
+
+mod_EF2 = "# a path
+         year_bi_std ~ a * lang_Comp
+
+         # b path
+         EF_Comp2 ~ b * year_bi_std
+
+         # c prime path 
+         EF_Comp2 ~ cp * lang_Comp
+
+         # indirect and total effects
+         ab := a * b
+         total := cp + ab"
+
+sem1 = sem(mod_EF1, data = proj_data1, se = "bootstrap", bootstrap = 10000)
+sem2 = sem(mod_EF2, data = proj_data1, se = "bootstrap", bootstrap = 10000)
+
+summary(sem1, standardized = T, fit.measures=T)
+summary(sem2, standardized = T, fit.measures=T)
+# saveRDS(sem1, file='data/mediation_obj1.RDS')
+# saveRDS(sem2, file='data/mediation_obj2.RDS')
+parameterestimates(sem21)
+parameterestimates(sem22)
+```
+
+```{r}
+set.seed(1)
+med_mod1 = "# a path
+         year_bi_std ~ a * lang_Comp
+
+         # b path
+         EF_Comp1 ~ b1 * year_bi_std + b2 * diagnosis + b3 * diagnosis:year_bi_std
+
+         # c prime path 
+         EF_Comp1 ~ cp * lang_Comp
+
+         # indirect and total effects
+         ab := a * b1 * b2 *b3
+         total := cp + ab"
+sem3 = sem(med_mod1, data = proj_data1, se = "bootstrap", bootstrap = 10000)
+# saveRDS(sem3, file='data/mod_mediation_obj3.RDS')
+# saveRDS(sem3, file='data/mediation_obj3.RDS')
+summary(sem3, standardized = T, fit.measures=T)
+parameterestimates(sem3)
+```
